@@ -27,5 +27,7 @@ defmodule AshMetrics do
   introspection.
   """
 
-  use Spark.Dsl.Extension, sections: [AshMetrics.Dsl.metrics()]
+  use Spark.Dsl.Extension,
+    sections: [AshMetrics.Dsl.metrics()],
+    verifiers: [AshMetrics.Verifiers.VerifyPrefix]
 end
