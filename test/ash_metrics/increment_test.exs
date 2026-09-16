@@ -19,6 +19,7 @@ defmodule AshMetrics.IncrementTest do
   alias AshMetrics.IncrementTest.ProviderFromMetadata
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
+  alias AshMetrics.Test.Job
   alias AshMetrics.Test.Plain
 
   setup do
@@ -132,6 +133,17 @@ defmodule AshMetrics.IncrementTest do
       assert error.message ==
                ":send_latency on AshMetrics.Test.Delivery is a distribution, not a " <>
                  "counter. Use `observe/4` to record a distribution."
+    end
+
+    test "raises when the metric is a gauge" do
+      error =
+        assert_raise ArgumentError, fn ->
+          AshMetrics.increment(Job, :backlog, outcome: :sent)
+        end
+
+      assert error.message ==
+               ":backlog on AshMetrics.Test.Job is a gauge, not a counter. A gauge " <>
+                 "is polled by AshMetrics itself and has no call site."
     end
 
     test "raises when the metric is not declared" do

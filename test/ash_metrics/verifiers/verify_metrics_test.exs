@@ -104,6 +104,55 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert Exception.message(error) =~ "declares buckets []"
   end
 
+  test "a gauge shares the metric namespace with a counter" do
+    assert [%DslError{path: [:metrics, :backlog]} = error] =
+             errors(
+               quote do
+                 counter :backlog, outcomes: [:sent]
+                 gauge :backlog
+               end
+             )
+
+    assert Exception.message(error) =~ "metric :backlog is declared more than once"
+  end
+
+  test "a gauge may only group by attributes of the resource" do
+    assert [%DslError{} = error] = errors(quote(do: gauge(:backlog, group_by: [:status, :nope])))
+
+    message = Exception.message(error)
+
+    assert message =~ "gauge :backlog groups by :nope, which is not an attribute"
+    assert message =~ "Declared attributes: :id, :status"
+  end
+
+  test "a gauge may not group by the same attribute twice" do
+    assert [%DslError{} = error] =
+             errors(quote(do: gauge(:backlog, group_by: [:status, :status])))
+
+    assert Exception.message(error) =~ "gauge :backlog groups by :status more than once"
+  end
+
+  test "a gauge may group by an attribute the tag extractor also supplies" do
+    assert errors(quote(do: gauge(:backlog, group_by: [:tenant])), [
+             quote(do: attribute(:tenant, :string))
+           ]) == []
+  end
+
+  test "a valid gauge produces no errors" do
+    # `context: Elixir` because `expr/1` turns bare names into references to
+    # attributes, and a hygienic `status` quoted here is a variable of this test
+    # module instead.
+    assert errors(
+             quote context: Elixir do
+               gauge :backlog,
+                 filter: expr(status == :pending),
+                 group_by: [:status],
+                 period: 1_000,
+                 description: "Pending jobs"
+             end
+           ) == []
+  end
+
   test "a valid declaration produces no errors" do
     assert errors(
              quote do
@@ -118,13 +167,16 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert length(Info.metrics(Delivery)) == 2
   end
 
-  defp errors(declarations) do
+  # The throwaway resource declares a `status` attribute, so that a gauge has
+  # something valid to group by; pass `attributes` for anything else it needs.
+  defp errors(declarations, attributes \\ []) do
     Compiler.dsl_errors(
       quote do
         metrics do
           unquote(declarations)
         end
-      end
+      end,
+      [quote(do: attribute(:status, :atom))] ++ attributes
     )
   end
 end

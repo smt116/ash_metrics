@@ -9,8 +9,14 @@ spark_locals_without_parens = [
   description: 1,
   distribution: 1,
   distribution: 2,
+  filter: 1,
+  gauge: 1,
+  gauge: 2,
+  group_by: 1,
   name: 1,
   outcomes: 1,
+  period: 1,
+  strategy: 1,
   tags: 1,
   unit: 1
 ]

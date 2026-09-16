@@ -63,6 +63,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Dsl,
           AshMetrics.Dsl.Counter,
           AshMetrics.Dsl.Distribution,
+          AshMetrics.Dsl.Gauge,
           AshMetrics.Info,
           AshMetrics.Verifiers.VerifyMetrics,
           AshMetrics.Verifiers.VerifyPrefix

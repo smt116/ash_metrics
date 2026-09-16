@@ -15,16 +15,19 @@ defmodule AshMetrics.Test.Compiler do
 
   require Spark.Test
 
-  @spec dsl_errors(Macro.t()) :: [Spark.Error.DslError.t()]
-  def dsl_errors(metrics_block) do
-    module = compile_resource(metrics_block)
+  @spec dsl_errors(Macro.t(), [Macro.t()]) :: [Spark.Error.DslError.t()]
+  def dsl_errors(metrics_block, attributes \\ []) do
+    module = compile_resource(metrics_block, attributes)
     collected = Spark.Test.dsl_errors(do: module.__verify_spark_dsl__(module))
 
     Enum.flat_map(collected, fn {_module, errors} -> errors end)
   end
 
-  @spec compile_resource(Macro.t()) :: module()
-  def compile_resource(metrics_block) do
+  # `attributes` are extra attribute declarations, quoted, for the resource's
+  # `attributes` block. A gauge groups by attributes, so a verifier test needs
+  # more than the primary key to have anything valid to group by.
+  @spec compile_resource(Macro.t(), [Macro.t()]) :: module()
+  def compile_resource(metrics_block, attributes \\ []) do
     module = unique_module()
     ExUnit.Callbacks.on_exit(fn -> purge(module) end)
 
@@ -42,6 +45,8 @@ defmodule AshMetrics.Test.Compiler do
 
           attributes do
             uuid_primary_key :id
+
+            unquote_splicing(attributes)
           end
         end
       end

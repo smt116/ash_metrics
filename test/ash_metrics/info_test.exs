@@ -3,9 +3,11 @@ defmodule AshMetrics.InfoTest do
 
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
+  alias AshMetrics.Dsl.Gauge
   alias AshMetrics.Info
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
+  alias AshMetrics.Test.Job
   alias AshMetrics.Test.Plain
 
   describe "metrics/1" do
@@ -39,6 +41,36 @@ defmodule AshMetrics.InfoTest do
 
     test "returns an empty list for a resource without the extension" do
       assert Info.metrics(Plain) == []
+    end
+
+    test "returns the gauges of a resource" do
+      assert [%Gauge{} = backlog, %Gauge{} = total] = Info.metrics(Job)
+
+      assert backlog.name == :backlog
+      assert backlog.group_by == [:status, :provider]
+      assert backlog.strategy == :count
+      assert backlog.period == 60_000
+      assert backlog.description == "Jobs waiting to be picked up"
+
+      assert total.name == :total
+      assert total.period == 30_000
+    end
+
+    test "keeps a gauge's filter as the Ash expression it was declared as" do
+      assert %Gauge{filter: filter} = Info.metric!(Job, :backlog)
+
+      assert is_struct(filter)
+      assert inspect(filter) == "status in [:pending, :processing]"
+    end
+
+    test "defaults a gauge's filter, grouping, strategy and period" do
+      assert %Gauge{
+               name: :total,
+               filter: nil,
+               group_by: [],
+               strategy: :count,
+               description: nil
+             } = Info.metric!(Job, :total)
     end
   end
 

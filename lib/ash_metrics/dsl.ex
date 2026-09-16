@@ -114,6 +114,77 @@ defmodule AshMetrics.Dsl do
     ]
   }
 
+  @gauge %Spark.Dsl.Entity{
+    name: :gauge,
+    describe: """
+    Declares a gauge: how many rows match a filter right now, broken down by
+    the values of `group_by`.
+
+    A gauge is the one primitive nothing emits by hand. The package polls it
+    every `period`, computes one value per group, and emits each one, so a
+    gauge is a question about the current state of a table rather than a record
+    of something that happened.
+
+    `group_by` names attributes of the resource, and their values become the
+    tags of the emission. One gauge with `group_by: [:status]` is therefore one
+    metric name with one timeseries per status.
+
+    The default `:count` strategy runs one query to learn which groups exist
+    and then one count per group, because Ash has no `GROUP BY`. That is
+    `1 + groups` queries per period, per tenant for a `:context` multitenant
+    resource. A resource whose backlog is expensive to count exactly can
+    supply its own `AshMetrics.Gauge.Strategy` instead.
+    """,
+    examples: [
+      "gauge :backlog, filter: expr(status == :pending)",
+      """
+      gauge :backlog do
+        filter expr(status in [:pending, :processing])
+        group_by [:status, :provider]
+        period :timer.minutes(1)
+        description "Jobs waiting to be picked up"
+      end
+      """
+    ],
+    target: AshMetrics.Dsl.Gauge,
+    args: [:name],
+    schema: [
+      name: [
+        type: :atom,
+        required: true,
+        doc: "The name of the gauge, used as the last segment of the metric name."
+      ],
+      filter: [
+        type: :any,
+        required: false,
+        doc:
+          "An Ash expression, built with `expr/1`, restricting what is counted. Counts every row when absent."
+      ],
+      group_by: [
+        type: {:list, :atom},
+        default: [],
+        doc:
+          "Attributes of the resource to break the value down by. Their values are the tags of each emission."
+      ],
+      strategy: [
+        type: {:or, [{:literal, :count}, :atom]},
+        default: :count,
+        doc: "`:count` for an exact count, or a module implementing the gauge strategy behaviour."
+      ],
+      period: [
+        type: :pos_integer,
+        default: 60_000,
+        doc:
+          "How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution, since most collectors flush on a ten second interval anyway and every poll costs queries."
+      ],
+      description: [
+        type: :string,
+        required: false,
+        doc: "A human readable description, passed through to the metric definition."
+      ]
+    ]
+  }
+
   @metrics %Spark.Dsl.Section{
     name: :metrics,
     describe: """
@@ -122,6 +193,9 @@ defmodule AshMetrics.Dsl do
     Declarations here compile to `Telemetry.Metrics` definitions, returned by
     `AshMetrics.metrics/0`, which the host application's reporter ships to its
     own backend.
+
+    `Ash.Expr` is imported into this section, so a gauge's `filter` can be
+    written with `expr/1` exactly as it would be anywhere else in the resource.
     """,
     examples: [
       """
@@ -132,6 +206,11 @@ defmodule AshMetrics.Dsl do
           outcomes: [:queued, :sent, :bounced, :delivered, :error],
           tags: [:provider, :template]
 
+        gauge :backlog,
+          filter: expr(status in [:pending, :processing]),
+          group_by: [:status, :provider],
+          period: :timer.minutes(1)
+
         distribution :send_latency,
           unit: {:native, :millisecond},
           buckets: [10, 50, 100, 250, 500, 1_000, 5_000],
@@ -139,6 +218,7 @@ defmodule AshMetrics.Dsl do
       end
       """
     ],
+    imports: [Ash.Expr],
     schema: [
       name: [
         type: :atom,
@@ -146,7 +226,7 @@ defmodule AshMetrics.Dsl do
         doc: "Overrides the resource short name used in metric names."
       ]
     ],
-    entities: [@counter, @distribution]
+    entities: [@counter, @gauge, @distribution]
   }
 
   @doc """

@@ -10,8 +10,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
 
   The checks are:
 
-  * metric names are unique — counters and distributions share one namespace,
-    because they share one metric name
+  * metric names are unique — counters, gauges and distributions share one
+    namespace, because they share one metric name
   * a counter declares at least one outcome, and no outcome twice
   * tag keys are not repeated
   * tag keys do not collide with the outcome tag or with the keys the
@@ -19,13 +19,20 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     emission and would otherwise be overwritten
   * bucket boundaries are a non-empty, strictly ascending list of positive
     numbers
+  * a gauge groups by attributes of the resource, and by none of them twice
+
+  A gauge's `group_by` is deliberately not checked against the reserved tags. A
+  reserved tag is one applied to every emission from a call site, and a gauge
+  has no call site: its tags are exactly the values of its `group_by`.
   """
 
   use Spark.Dsl.Verifier
 
+  alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
+  alias AshMetrics.Dsl.Gauge
   alias Spark.Dsl.Entity
   alias Spark.Dsl.Verifier
   alias Spark.Error.DslError
@@ -57,8 +64,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
         error(
           dsl_state,
           Enum.find(metrics, &(&1.name == name)),
-          "metric #{inspect(name)} is declared more than once. Counters and " <>
-            "distributions share one namespace, because they share one metric name."
+          "metric #{inspect(name)} is declared more than once. Counters, gauges " <>
+            "and distributions share one namespace, because they share one metric name."
         )
     end
   end
@@ -70,6 +77,48 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   defp verify_metric(dsl_state, %Distribution{} = distribution) do
     with :ok <- verify_tags(dsl_state, distribution),
          do: verify_buckets(dsl_state, distribution)
+  end
+
+  defp verify_metric(dsl_state, %Gauge{} = gauge) do
+    with :ok <- verify_unique_group_by(dsl_state, gauge),
+         do: verify_group_by_attributes(dsl_state, gauge)
+  end
+
+  defp verify_unique_group_by(dsl_state, %Gauge{} = gauge) do
+    case duplicates(gauge.group_by) do
+      [] ->
+        :ok
+
+      duplicated ->
+        error(
+          dsl_state,
+          gauge,
+          "gauge #{inspect(gauge.name)} groups by #{list(duplicated)} more than " <>
+            "once. Each group_by attribute becomes one tag, so repeating it " <>
+            "changes nothing."
+        )
+    end
+  end
+
+  defp verify_group_by_attributes(dsl_state, %Gauge{} = gauge) do
+    case Enum.reject(gauge.group_by, &ResourceInfo.attribute(dsl_state, &1)) do
+      [] ->
+        :ok
+
+      [name | _rest] ->
+        error(
+          dsl_state,
+          gauge,
+          "gauge #{inspect(gauge.name)} groups by #{inspect(name)}, which is not " <>
+            "an attribute of this resource. A gauge groups by attributes, because " <>
+            "it is a query over the resource's own table. Declared attributes: " <>
+            attributes(dsl_state)
+        )
+    end
+  end
+
+  defp attributes(dsl_state) do
+    dsl_state |> ResourceInfo.attributes() |> Enum.map(& &1.name) |> list()
   end
 
   defp verify_outcomes(dsl_state, %Counter{outcomes: []} = counter) do

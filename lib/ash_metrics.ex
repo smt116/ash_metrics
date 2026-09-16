@@ -56,6 +56,7 @@ defmodule AshMetrics do
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
+  alias AshMetrics.Dsl.Gauge
   alias AshMetrics.Info
   alias AshMetrics.NameBuilder
   alias AshMetrics.TagExtractor
@@ -124,6 +125,9 @@ defmodule AshMetrics do
         raise ArgumentError,
               "#{inspect(metric)} on #{inspect(resource)} is a distribution, not a " <>
                 "counter. Use `observe/4` to record a distribution."
+
+      %Gauge{} ->
+        raise ArgumentError, gauge_message(resource, metric, "counter")
     end
   end
 
@@ -182,7 +186,16 @@ defmodule AshMetrics do
         raise ArgumentError,
               "#{inspect(metric)} on #{inspect(resource)} is a counter, not a " <>
                 "distribution. Use `increment/3` to emit a counter."
+
+      %Gauge{} ->
+        raise ArgumentError, gauge_message(resource, metric, "distribution")
     end
+  end
+
+  @spec gauge_message(module(), atom(), String.t()) :: String.t()
+  defp gauge_message(resource, metric, kind) do
+    "#{inspect(metric)} on #{inspect(resource)} is a gauge, not a #{kind}. A " <>
+      "gauge is polled by AshMetrics itself and has no call site."
   end
 
   @spec outcome!(module(), Counter.t(), keyword()) :: atom()
@@ -287,7 +300,10 @@ defmodule AshMetrics do
     resources
     |> Enum.filter(&declares_metrics?/1)
     |> Enum.flat_map(fn resource ->
-      Enum.map(Info.metrics(resource), &definition(resource, &1, extractor_keys))
+      resource
+      |> Info.metrics()
+      |> Enum.reject(&match?(%Gauge{}, &1))
+      |> Enum.map(&definition(resource, &1, extractor_keys))
     end)
     |> transform()
   end

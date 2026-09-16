@@ -19,6 +19,7 @@ defmodule AshMetrics.ObserveTest do
   alias AshMetrics.ObserveTest.ProviderFromMetadata
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
+  alias AshMetrics.Test.Job
 
   setup do
     handler = "ash-metrics-observe-#{System.unique_integer([:positive])}"
@@ -124,6 +125,14 @@ defmodule AshMetrics.ObserveTest do
       assert error.message ==
                ":delivery on AshMetrics.Test.Delivery is a counter, not a " <>
                  "distribution. Use `increment/3` to emit a counter."
+    end
+
+    test "raises when the metric is a gauge" do
+      error = assert_raise ArgumentError, fn -> AshMetrics.observe(Job, :backlog, 1) end
+
+      assert error.message ==
+               ":backlog on AshMetrics.Test.Job is a gauge, not a distribution. A " <>
+                 "gauge is polled by AshMetrics itself and has no call site."
     end
 
     test "raises when the metric is not declared" do

@@ -55,9 +55,13 @@ Declarations here compile to `Telemetry.Metrics` definitions, returned by
 `AshMetrics.metrics/0`, which the host application's reporter ships to its
 own backend.
 
+`Ash.Expr` is imported into this section, so a gauge's `filter` can be
+written with `expr/1` exactly as it would be anywhere else in the resource.
+
 
 ### Nested DSLs
  * [counter](#metrics-counter)
+ * [gauge](#metrics-gauge)
  * [distribution](#metrics-distribution)
 
 
@@ -69,6 +73,11 @@ metrics do
   counter :delivery,
     outcomes: [:queued, :sent, :bounced, :delivered, :error],
     tags: [:provider, :template]
+
+  gauge :backlog,
+    filter: expr(status in [:pending, :processing]),
+    group_by: [:status, :provider],
+    period: :timer.minutes(1)
 
   distribution :send_latency,
     unit: {:native, :millisecond},
@@ -145,6 +154,73 @@ end
 ### Introspection
 
 Target: `AshMetrics.Dsl.Counter`
+
+### metrics.gauge
+```elixir
+gauge name
+```
+
+
+Declares a gauge: how many rows match a filter right now, broken down by
+the values of `group_by`.
+
+A gauge is the one primitive nothing emits by hand. The package polls it
+every `period`, computes one value per group, and emits each one, so a
+gauge is a question about the current state of a table rather than a record
+of something that happened.
+
+`group_by` names attributes of the resource, and their values become the
+tags of the emission. One gauge with `group_by: [:status]` is therefore one
+metric name with one timeseries per status.
+
+The default `:count` strategy runs one query to learn which groups exist
+and then one count per group, because Ash has no `GROUP BY`. That is
+`1 + groups` queries per period, per tenant for a `:context` multitenant
+resource. A resource whose backlog is expensive to count exactly can
+supply its own `AshMetrics.Gauge.Strategy` instead.
+
+
+
+
+### Examples
+```
+gauge :backlog, filter: expr(status == :pending)
+```
+
+```
+gauge :backlog do
+  filter expr(status in [:pending, :processing])
+  group_by [:status, :provider]
+  period :timer.minutes(1)
+  description "Jobs waiting to be picked up"
+end
+
+```
+
+
+
+### Arguments
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`name`](#metrics-gauge-name){: #metrics-gauge-name .spark-required} | `atom` |  | The name of the gauge, used as the last segment of the metric name. |
+### Options
+
+| Name | Type | Default | Docs |
+|------|------|---------|------|
+| [`filter`](#metrics-gauge-filter){: #metrics-gauge-filter } | `any` |  | An Ash expression, built with `expr/1`, restricting what is counted. Counts every row when absent. |
+| [`group_by`](#metrics-gauge-group_by){: #metrics-gauge-group_by } | `list(atom)` | `[]` | Attributes of the resource to break the value down by. Their values are the tags of each emission. |
+| [`strategy`](#metrics-gauge-strategy){: #metrics-gauge-strategy } | `:count \| atom` | `:count` | `:count` for an exact count, or a module implementing the gauge strategy behaviour. |
+| [`period`](#metrics-gauge-period){: #metrics-gauge-period } | `pos_integer` | `60000` | How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution, since most collectors flush on a ten second interval anyway and every poll costs queries. |
+| [`description`](#metrics-gauge-description){: #metrics-gauge-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
+
+
+
+
+
+### Introspection
+
+Target: `AshMetrics.Dsl.Gauge`
 
 ### metrics.distribution
 ```elixir
