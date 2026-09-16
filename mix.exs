@@ -10,7 +10,12 @@ defmodule AshMetrics.MixProject do
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
-      deps: deps()
+      deps: deps(),
+      dialyzer: [
+        plt_core_path: "priv/plts",
+        plt_file: {:no_warn, "priv/plts/ash_metrics.plt"},
+        plt_add_apps: [:mix]
+      ]
     ]
   end
 
@@ -31,7 +36,8 @@ defmodule AshMetrics.MixProject do
       {:telemetry_metrics, "~> 1.0"},
       # Required by the Spark.Formatter plugin in .formatter.exs.
       {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false},
-      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false}
     ]
   end
 end
