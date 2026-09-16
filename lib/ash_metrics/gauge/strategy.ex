@@ -29,6 +29,12 @@ defmodule AshMetrics.Gauge.Strategy do
   Every entry is emitted as one measurement with the tags it carries, so the
   cardinality of the result is the cardinality of the metric. Returning one
   entry per row of a large table publishes one timeseries per row.
+
+  The gauge a strategy is handed is not always the one that was declared. For
+  a resource using Ash's `:attribute` multitenancy strategy,
+  `AshMetrics.Gauge.Runner` appends the tenant attribute to `group_by`, so that
+  one query covers every tenant; a strategy that groups by what the gauge it
+  is given says needs to do nothing about that.
   """
 
   alias AshMetrics.Dsl.Gauge
