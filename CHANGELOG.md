@@ -11,10 +11,12 @@ and this project adheres to
 ### Added
 
 - `AshMetrics`, an `Ash.Resource` extension adding a `metrics do` block with
-  `counter` and `distribution` declarations.
+  `counter`, `gauge` and `distribution` declarations.
 - Compile-time verification of the declarations: a configured `prefix`, unique
   metric names, non-empty unique outcomes, unique tag keys that do not collide
-  with reserved ones, and strictly ascending positive buckets.
+  with reserved ones, strictly ascending positive buckets, gauges grouping by
+  attributes of their resource, and a configured `tenant_source` for a
+  `:context` multitenant resource declaring a gauge.
 - `AshMetrics.increment/3` and `AshMetrics.observe/4`, which validate the
   metric, outcome and tag keys at the call site before emitting.
 - `AshMetrics.metrics/0` and `AshMetrics.metrics_for/1`, which compile the
@@ -24,6 +26,16 @@ and this project adheres to
   `:ash_metrics` application environment.
 - `AshMetrics.NameBuilder` and `AshMetrics.TagExtractor` behaviours, with
   `AshMetrics.NameBuilder.Default` and `AshMetrics.TagExtractor.Default`.
+- `AshMetrics.Gauge.Strategy` behaviour, with `AshMetrics.Gauge.Strategy.Count`,
+  which counts each group exactly.
+- `AshMetrics.TenantSource` behaviour, for enumerating the tenants of a
+  `:context` multitenant resource.
+- `AshMetrics.Gauge.Runner`, which polls one gauge, emits one value per group
+  and per tenant, and emits a single zero for a group that has vanished.
+- `AshMetrics.Poller` behaviour, with `AshMetrics.Poller.GenServer`, which
+  polls every gauge from one process on a timer per gauge and survives a
+  failing or raising strategy.
+- `AshMetrics.child_specs/1`, the backend's children followed by the poller's.
 - `AshMetrics.Backend` behaviour, with `AshMetrics.Backend.Noop` and
   `AshMetrics.Backend.Test`.
 - `use AshMetrics.Test`, with `assert_metric_emitted/2` and

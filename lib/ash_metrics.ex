@@ -3,8 +3,8 @@ defmodule AshMetrics do
   Declarative business metrics for Ash resources.
 
   `AshMetrics` is an `Ash.Resource` extension that adds a `metrics do` block in
-  which counters and distributions are declared next to the action they describe
-  and validated at compile time. Those declarations compile to
+  which counters, gauges and distributions are declared next to the action they
+  describe and validated at compile time. Those declarations compile to
   `Telemetry.Metrics` definitions rather than to a new emit/aggregate/export
   pipeline, so the host application's existing reporter is what actually ships
   them to a backend.
@@ -20,6 +20,10 @@ defmodule AshMetrics do
           counter :delivery,
             outcomes: [:queued, :sent, :bounced, :delivered, :error],
             tags: [:provider, :template]
+
+          gauge :backlog,
+            filter: expr(status in [:pending, :processing]),
+            group_by: [:status]
         end
       end
 
@@ -37,9 +41,14 @@ defmodule AshMetrics do
         metadata: changeset.context
       )
 
-  What the host application consumes is `metrics/0`: the declarations of every
-  resource, compiled to `Telemetry.Metrics` definitions, ready to be spliced
-  into whatever reporter it already runs.
+  A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
+  `period` and emits one value per group, which is why a gauge is declared with
+  the query that answers it rather than with the tags a caller may pass.
+
+  What the host application consumes is `metrics/0`, the declarations of every
+  resource compiled to `Telemetry.Metrics` definitions, ready to be spliced
+  into whatever reporter it already runs, and `child_specs/1`, which starts the
+  configured backend and the poller.
 
   See `AshMetrics.Dsl` for the section definition and `AshMetrics.Info` for
   introspection.

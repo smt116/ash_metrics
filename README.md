@@ -1,8 +1,8 @@
 # AshMetrics
 
-**Status:** pre-release, not on Hex. Counters, distributions, the emission API,
-the behaviours and the test helpers work; gauges and their pollers do not exist
-yet.
+**Status:** pre-release, not on Hex. Counters, distributions, gauges with their
+polling, the emission API, the behaviours and the test helpers work. The
+`ash_oban` poller and the OpenTelemetry backend do not exist yet.
 
 ## What it is
 
@@ -28,7 +28,7 @@ StatsD, Prometheus, AppSignal. Counter emission is a synchronous
 - **`counter`** — "How many events? How fast?" Emitted manually at the business
   moment the outcome becomes known.
 - **`gauge`** — "How many right now?" Filled by a package-managed periodic poll
-  over the resource. Not implemented yet.
+  over the resource.
 - **`distribution`** — "What's the spread?" Observed manually.
 
 ## Installation
@@ -45,7 +45,9 @@ config :ash_metrics,
   outcome_tag: :outcome,
   name_builder: AshMetrics.NameBuilder.Default,
   tag_extractor: AshMetrics.TagExtractor.Default,
-  backend: AshMetrics.Backend.Noop
+  backend: AshMetrics.Backend.Noop,
+  poller: AshMetrics.Poller.GenServer,
+  tenant_source: MyApp.Tenants                      # :context multitenancy only
 ```
 
 `prefix` must be set in compile-time configuration — `config/config.exs`, not
@@ -79,6 +81,14 @@ defmodule MyApp.Mailings.TemplatedDelivery do
       outcomes: [:queued, :sent, :bounced, :delivered, :error],
       tags: [:provider, :template],
       description: "Templated deliveries by outcome"
+
+    # → myapp.mailings.templated_delivery.backlog.gauge
+    #   tags: status, provider
+    gauge :backlog,
+      filter: expr(status in [:pending, :processing]),
+      group_by: [:status, :provider],
+      period: :timer.minutes(1),
+      description: "Deliveries waiting to be sent"
 
     # → myapp.mailings.templated_delivery.send_latency.duration
     #   tags: provider, tenant
@@ -126,6 +136,48 @@ build.
 
 See the [DSL reference](documentation/dsls/DSL-AshMetrics.md) for every option.
 
+### Gauges
+
+A gauge is the one primitive you never emit. AshMetrics polls it every `period`
+and emits one value per group, so the declaration above publishes
+`myapp.mailings.templated_delivery.backlog.gauge` with a `status` and a
+`provider` tag and one timeseries per combination that exists.
+
+What a poll costs is worth knowing before you shorten a period. Ash has no
+`GROUP BY`, so the default `:count` strategy runs one read to learn which
+groups exist and then one exact count per group: `1 + groups` queries per
+period, and per tenant for a `:context` multitenant resource. Queries run with
+`authorize?: false`, because a poll has no actor and a gauge that counted only
+what someone may see would misreport the table. When that is too expensive,
+declare `strategy: MyApp.Stats.Backlog` — any module implementing
+`AshMetrics.Gauge.Strategy` — and compute the number however you like.
+
+Sub-minute periods are usually wasted resolution: most collectors flush on a
+ten second interval anyway, and every poll costs the queries above.
+
+A group that disappears is emitted once as a zero. Without that, a
+`last_value` metric would report the backlog's last non-zero value forever
+after it drained, which is exactly when someone is looking at it.
+
+### Multitenancy
+
+Ash's two multitenancy strategies are handled differently, but a gauge is
+tagged with `tenant` either way:
+
+- `:attribute` — the tenant is one of the resource's own attributes, so one
+  query covers every tenant. Nothing needs configuring. The resource does need
+  `global? true` in its `multitenancy` block, since Ash otherwise refuses a
+  read that names no tenant.
+- `:context` — each tenant's rows live in their own schema, so the gauge is
+  polled once per tenant of the configured `tenant_source`, a module
+  implementing `AshMetrics.TenantSource`. A compile-time verifier rejects a
+  `:context` multitenant resource that declares a gauge while the key is
+  unset, because such a gauge would otherwise be polled for nobody and emit
+  nothing.
+
+Note the multiplier: a `:context` gauge costs its queries once per tenant per
+period.
+
 ## Wiring into your reporter
 
 `AshMetrics.metrics/0` returns the `Telemetry.Metrics` definitions of every
@@ -143,7 +195,7 @@ defmodule MyApp.Telemetry do
     children =
       [
         {Telemetry.Metrics.ConsoleReporter, metrics: my_own_metrics() ++ AshMetrics.metrics()}
-      ] ++ AshMetrics.Backend.child_specs()
+      ] ++ AshMetrics.child_specs()
 
     Supervisor.init(children, strategy: :one_for_one)
   end
@@ -156,10 +208,17 @@ The same list works for a Prometheus reporter:
 {TelemetryMetricsPrometheus, metrics: AshMetrics.metrics()}
 ```
 
-`AshMetrics.Backend.child_specs/0` starts whatever the configured backend needs.
-With the default `AshMetrics.Backend.Noop` it returns `[]`, which is the right
-answer when you already run a reporter of your own. Pass an explicit resource
-list to `AshMetrics.metrics_for/1` if domain discovery is not what you want.
+`AshMetrics.child_specs/0` starts whatever the configured backend needs,
+followed by the poller that keeps the gauges up to date. With the default
+`AshMetrics.Backend.Noop` the backend adds nothing, which is the right answer
+when you already run a reporter of your own. Pass an explicit resource list to
+`AshMetrics.metrics_for/1` if domain discovery is not what you want.
+
+Every node polls, so in a cluster each gauge is computed and emitted once per
+node per period. A `last_value` of the same number reported by five nodes is
+still that number, but the queries behind it are not free; a poller backed by
+a job queue is the answer when that matters, and `AshMetrics.Poller` is the
+behaviour to implement.
 
 ## Testing
 
@@ -183,7 +242,7 @@ end
 
 `use AshMetrics.Test` attaches a handler for the duration of each test and
 imports the assertions. Name the metric as the declaration produces it, without
-the `.count` or `.duration` suffix a reporter adds. `:telemetry` handlers are
+the `.count`, `.gauge` or `.duration` suffix a reporter adds. `:telemetry` handlers are
 global, so keep such modules `async: false` — see `AshMetrics.Test` for the
 details.
 
