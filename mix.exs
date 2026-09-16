@@ -13,6 +13,7 @@ defmodule AshMetrics.MixProject do
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
       deps: deps(),
+      aliases: aliases(),
       package: package(),
       docs: docs(),
       dialyzer: [
@@ -40,15 +41,55 @@ defmodule AshMetrics.MixProject do
       # Hex requires the `links` key. Left empty until the repository
       # URL is decided; no placeholder URL is published.
       links: %{},
-      files: ~w(lib .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib documentation .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
   defp docs do
     [
       main: "readme",
-      extras: ["README.md", "CHANGELOG.md"],
+      extras: [
+        "README.md",
+        "documentation/dsls/DSL-AshMetrics.md",
+        "CHANGELOG.md"
+      ],
+      groups_for_extras: [
+        DSL: ~r"documentation/dsls"
+      ],
+      groups_for_modules: [
+        "Extension & API": [
+          AshMetrics,
+          AshMetrics.Config,
+          AshMetrics.Dsl,
+          AshMetrics.Dsl.Counter,
+          AshMetrics.Dsl.Distribution,
+          AshMetrics.Info,
+          AshMetrics.Verifiers.VerifyMetrics,
+          AshMetrics.Verifiers.VerifyPrefix
+        ],
+        Behaviours: [
+          AshMetrics.Backend,
+          AshMetrics.NameBuilder,
+          AshMetrics.TagExtractor
+        ],
+        Defaults: [
+          AshMetrics.Backend.Noop,
+          AshMetrics.NameBuilder.Default,
+          AshMetrics.TagExtractor.Default
+        ],
+        Testing: [
+          AshMetrics.Backend.Test,
+          AshMetrics.Test
+        ]
+      ],
       formatters: ["html"]
+    ]
+  end
+
+  defp aliases do
+    [
+      "spark.cheat_sheets": "spark.cheat_sheets --extensions AshMetrics",
+      docs: ["spark.cheat_sheets", "docs", "spark.replace_doc_links"]
     ]
   end
 
@@ -62,7 +103,10 @@ defmodule AshMetrics.MixProject do
       {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:ex_doc, "~> 0.40", only: :dev, runtime: false}
+      {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+      # Required by the `spark.cheat_sheets` task used to build the DSL
+      # reference. Not an installer; `mix igniter.install` is not supported.
+      {:igniter, "~> 0.6", only: [:dev, :test], runtime: false}
     ]
   end
 end
