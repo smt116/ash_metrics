@@ -29,5 +29,8 @@ defmodule AshMetrics do
 
   use Spark.Dsl.Extension,
     sections: [AshMetrics.Dsl.metrics()],
-    verifiers: [AshMetrics.Verifiers.VerifyPrefix]
+    verifiers: [
+      AshMetrics.Verifiers.VerifyPrefix,
+      AshMetrics.Verifiers.VerifyMetrics
+    ]
 end
