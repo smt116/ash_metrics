@@ -54,12 +54,14 @@ defmodule AshMetrics do
     ]
 
   alias Ash.Domain.Info, as: DomainInfo
+  alias AshMetrics.Backend
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Dsl.Gauge
   alias AshMetrics.Info
   alias AshMetrics.NameBuilder
+  alias AshMetrics.Poller
   alias AshMetrics.TagExtractor
 
   @typedoc "Tag keys and values attached to an emission."
@@ -249,6 +251,36 @@ defmodule AshMetrics do
                 list(metric.tags)
     end
   end
+
+  @doc """
+  Everything AshMetrics needs running, for a supervision tree.
+
+  That is whatever the configured `AshMetrics.Backend` starts, followed by
+  whatever the configured `AshMetrics.Poller` needs to poll the declared
+  gauges. The backend comes first, so that a backend which starts a reporter
+  is ready before the first gauge is polled.
+
+      defmodule MyApp.Application do
+        use Application
+
+        @impl Application
+        def start(_type, _args) do
+          children =
+            [
+              MyApp.Repo,
+              MyAppWeb.Endpoint,
+              {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()}
+            ] ++ AshMetrics.child_specs()
+
+          Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
+        end
+      end
+
+  `opts` are passed to both. An application that declares no gauges and runs
+  the default backend still gets the poller's process, which sits idle.
+  """
+  @spec child_specs(keyword()) :: [Supervisor.child_spec()]
+  def child_specs(opts \\ []), do: Backend.child_specs(opts) ++ Poller.child_specs(opts)
 
   @doc """
   The `Telemetry.Metrics` definitions of every resource that declares metrics.
