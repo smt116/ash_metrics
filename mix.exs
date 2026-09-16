@@ -30,7 +30,8 @@ defmodule AshMetrics.MixProject do
       {:telemetry, "~> 1.0"},
       {:telemetry_metrics, "~> 1.0"},
       # Required by the Spark.Formatter plugin in .formatter.exs.
-      {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false}
+      {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false},
+      {:credo, "~> 1.7", only: [:dev, :test], runtime: false}
     ]
   end
 end
