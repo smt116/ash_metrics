@@ -12,6 +12,12 @@ defmodule AshMetrics.Test.Delivery do
       outcomes: [:queued, :sent, :bounced, :delivered, :error],
       tags: [:provider, :template],
       description: "Templated deliveries by outcome"
+
+    distribution :send_latency,
+      unit: {:native, :millisecond},
+      buckets: [10, 50, 100, 250, 500],
+      tags: [:provider],
+      description: "Time from enqueue to provider acknowledgement"
   end
 
   attributes do

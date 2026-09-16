@@ -12,9 +12,10 @@ defmodule AshMetrics.Info do
 
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Dsl.Counter
+  alias AshMetrics.Dsl.Distribution
 
   @typedoc "Any metric declaration that can appear in a `metrics` block."
-  @type metric :: Counter.t()
+  @type metric :: Counter.t() | Distribution.t()
 
   @typedoc "A resource, or the DSL state of a resource being compiled."
   @type resource :: module() | Spark.Dsl.t()
