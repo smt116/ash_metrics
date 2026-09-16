@@ -23,11 +23,17 @@ defmodule AshMetrics do
         end
       end
 
-  Counters are emitted by hand, at the moment the outcome becomes known:
+  Counters and distributions are emitted by hand, at the moment the outcome
+  becomes known:
 
       AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
         outcome: :sent,
         tags: %{provider: "ses", template: "welcome_v2"},
+        metadata: changeset.context
+      )
+
+      AshMetrics.observe(MyApp.Mailings.TemplatedDelivery, :send_latency, 142,
+        tags: %{provider: "ses"},
         metadata: changeset.context
       )
 
@@ -85,6 +91,8 @@ defmodule AshMetrics do
   Extracted tags are merged under the explicit ones, so a call site can always
   override what the extractor derived.
 
+  ## Example
+
       AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
         outcome: :bounced,
         tags: %{provider: "ses"},
@@ -109,7 +117,65 @@ defmodule AshMetrics do
       %Distribution{} ->
         raise ArgumentError,
               "#{inspect(metric)} on #{inspect(resource)} is a distribution, not a " <>
-                "counter. Use observe/4 to record a distribution."
+                "counter. Use `observe/4` to record a distribution."
+    end
+  end
+
+  @doc """
+  Records `value` for the distribution `metric` on `resource`.
+
+  As with `increment/3`, everything is checked before the event is executed and
+  anything wrong raises `ArgumentError`: `metric` must be a declared
+  `distribution` on `resource`, `value` must be a number, and every key of
+  `tags` must be one of that distribution's declared tags.
+
+  The value is recorded in whatever unit the declaration says. A declaration
+  with a conversion unit such as `{:native, :millisecond}` converts when the
+  metric definition is compiled, not here, so a call site can pass a raw
+  monotonic-time difference.
+
+  ## Options
+
+  * `:tags` — a map of call-site tags, defaulting to `%{}`.
+  * `:metadata` — a map passed to the configured `AshMetrics.TagExtractor`,
+    defaulting to `%{}`.
+
+  ## Example
+
+      AshMetrics.observe(MyApp.Mailings.TemplatedDelivery, :send_latency, 142,
+        tags: %{provider: "ses"},
+        metadata: %{tenant: "acme"}
+      )
+  """
+  @spec observe(module(), atom(), number(), keyword()) :: :ok
+  def observe(resource, metric, value, opts \\ [])
+
+  def observe(resource, metric, value, opts) when is_number(value) do
+    distribution = distribution!(resource, metric)
+
+    :telemetry.execute(
+      event_name(resource, metric),
+      %{value: value},
+      tags(resource, distribution, opts)
+    )
+  end
+
+  def observe(resource, metric, value, _opts) do
+    raise ArgumentError,
+          "observe/4 records a number, got: #{inspect(value)}. Distribution " <>
+            "#{inspect(metric)} on #{inspect(resource)} cannot record anything else."
+  end
+
+  @spec distribution!(module(), atom()) :: Distribution.t()
+  defp distribution!(resource, metric) do
+    case Info.metric!(resource, metric) do
+      %Distribution{} = distribution ->
+        distribution
+
+      %Counter{} ->
+        raise ArgumentError,
+              "#{inspect(metric)} on #{inspect(resource)} is a counter, not a " <>
+                "distribution. Use `increment/3` to emit a counter."
     end
   end
 
@@ -139,7 +205,7 @@ defmodule AshMetrics do
       "on #{inspect(resource)} declares the outcomes: #{list(counter.outcomes)}"
   end
 
-  @spec tags(module(), Counter.t(), keyword()) :: tags()
+  @spec tags(module(), Counter.t() | Distribution.t(), keyword()) :: tags()
   defp tags(resource, metric, opts) do
     explicit = Keyword.get(opts, :tags, %{})
     declared_tags!(resource, metric, explicit)
@@ -150,7 +216,7 @@ defmodule AshMetrics do
     |> Map.merge(explicit)
   end
 
-  @spec declared_tags!(module(), Counter.t(), tags()) :: :ok
+  @spec declared_tags!(module(), Counter.t() | Distribution.t(), tags()) :: :ok
   defp declared_tags!(resource, metric, explicit) do
     case Enum.reject(Map.keys(explicit), &(&1 in metric.tags)) do
       [] ->
@@ -164,8 +230,9 @@ defmodule AshMetrics do
     end
   end
 
-  @spec kind(Counter.t()) :: String.t()
+  @spec kind(Counter.t() | Distribution.t()) :: String.t()
   defp kind(%Counter{}), do: "counter"
+  defp kind(%Distribution{}), do: "distribution"
 
   @spec list([atom()]) :: String.t()
   defp list([]), do: "none"

@@ -37,7 +37,7 @@ defmodule AshMetrics.Info do
   Fetches a single metric declaration by name, raising if it is not declared.
 
   The `ArgumentError` lists the metrics the resource does declare, since the
-  usual cause is a typo at an AshMetrics.increment/3 or AshMetrics.observe/4
+  usual cause is a typo at an `AshMetrics.increment/3` or `AshMetrics.observe/4`
   call site.
   """
   @spec metric!(resource(), atom()) :: metric()

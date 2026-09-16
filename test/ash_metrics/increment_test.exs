@@ -131,7 +131,7 @@ defmodule AshMetrics.IncrementTest do
 
       assert error.message ==
                ":send_latency on AshMetrics.Test.Delivery is a distribution, not a " <>
-                 "counter. Use observe/4 to record a distribution."
+                 "counter. Use `observe/4` to record a distribution."
     end
 
     test "raises when the metric is not declared" do

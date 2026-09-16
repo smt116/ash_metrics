@@ -3,7 +3,7 @@ defmodule AshMetrics.Dsl.Distribution do
   A distribution declared in a resource's `metrics` block.
 
   A distribution answers "what is the spread?". It is observed manually with
-  AshMetrics.observe/4 and compiles to a `Telemetry.Metrics.Distribution`.
+  `AshMetrics.observe/4` and compiles to a `Telemetry.Metrics.Distribution`.
 
   `unit` is handed to `Telemetry.Metrics`, so it accepts either a plain unit
   atom or a conversion tuple such as `{:native, :millisecond}`, in which case
