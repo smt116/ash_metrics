@@ -45,8 +45,9 @@ defmodule AshMetrics.Config do
 
             config :ash_metrics, prefix: "myapp"
 
-        `config/runtime.exs` is too late: metric names are built from the prefix
-        while resources are compiled.
+        `config/runtime.exs` alone is too late: a compile-time verifier refuses
+        to build a resource that declares metrics unless the prefix is
+        configured when the resource compiles.
         """
     end
   end

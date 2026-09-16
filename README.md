@@ -49,11 +49,12 @@ config :ash_metrics,
 ```
 
 `prefix` must be set in compile-time configuration — `config/config.exs`, not
-`config/runtime.exs`. Metric names are built from it while resources compile,
-and a compile-time verifier refuses to build a resource that declares metrics
-without it. It is required rather than derived from `otp_app` because looking up
-the owning application at compile time is unreliable, and a metric name is a
-permanent contract that cannot be quietly wrong.
+`config/runtime.exs` alone. A compile-time verifier refuses to build a resource
+that declares metrics unless it is configured; the metric names themselves are
+built when `AshMetrics.metrics/0` runs. It is required rather than derived from
+`otp_app` because looking up the owning application at compile time is
+unreliable, and a metric name is a permanent contract that cannot be quietly
+wrong.
 
 `otp_app` is the application whose Ash domains `AshMetrics.metrics/0` searches
 to find the resources that declare metrics.
