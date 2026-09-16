@@ -49,7 +49,8 @@ defmodule AshMetrics do
     sections: [AshMetrics.Dsl.metrics()],
     verifiers: [
       AshMetrics.Verifiers.VerifyPrefix,
-      AshMetrics.Verifiers.VerifyMetrics
+      AshMetrics.Verifiers.VerifyMetrics,
+      AshMetrics.Verifiers.VerifyTenantSource
     ]
 
   alias Ash.Domain.Info, as: DomainInfo

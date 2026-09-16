@@ -17,7 +17,14 @@ defmodule AshMetrics.Test.Compiler do
 
   @spec dsl_errors(Macro.t(), [Macro.t()]) :: [Spark.Error.DslError.t()]
   def dsl_errors(metrics_block, attributes \\ []) do
-    module = compile_resource(metrics_block, attributes)
+    metrics_block |> compile_resource(attributes) |> dsl_errors_for()
+  end
+
+  # Re-verifies a module that is already compiled, which is how a verifier that
+  # reads the application environment is tested: the configuration it read
+  # while the module compiled can be changed and the verifier run again.
+  @spec dsl_errors_for(module()) :: [Spark.Error.DslError.t()]
+  def dsl_errors_for(module) do
     collected = Spark.Test.dsl_errors(do: module.__verify_spark_dsl__(module))
 
     Enum.flat_map(collected, fn {_module, errors} -> errors end)

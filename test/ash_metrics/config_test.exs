@@ -9,7 +9,15 @@ defmodule AshMetrics.ConfigTest do
 
     on_exit(fn ->
       Enum.each(
-        [:prefix, :otp_app, :outcome_tag, :name_builder, :tag_extractor, :backend],
+        [
+          :prefix,
+          :otp_app,
+          :outcome_tag,
+          :name_builder,
+          :tag_extractor,
+          :backend,
+          :tenant_source
+        ],
         fn key ->
           case Keyword.fetch(original, key) do
             {:ok, value} -> Application.put_env(:ash_metrics, key, value)
@@ -80,6 +88,48 @@ defmodule AshMetrics.ConfigTest do
       error = assert_raise ArgumentError, fn -> Config.otp_app!() end
 
       assert error.message =~ ~s(got: "my_app")
+    end
+  end
+
+  describe "tenant_source/0" do
+    test "returns the configured tenant source" do
+      assert Config.tenant_source() == AshMetrics.Test.Tenants
+    end
+
+    test "returns nil when there is none" do
+      Application.delete_env(:ash_metrics, :tenant_source)
+
+      assert Config.tenant_source() == nil
+    end
+  end
+
+  describe "tenant_source!/0" do
+    test "returns the configured tenant source" do
+      assert Config.tenant_source!() == AshMetrics.Test.Tenants
+    end
+
+    test "returns an overridden tenant source" do
+      Application.put_env(:ash_metrics, :tenant_source, MyApp.Tenants)
+
+      assert Config.tenant_source!() == MyApp.Tenants
+    end
+
+    test "raises showing the config snippet when it is missing" do
+      Application.delete_env(:ash_metrics, :tenant_source)
+
+      error = assert_raise ArgumentError, fn -> Config.tenant_source!() end
+
+      assert error.message =~ "`tenant_source` must be set to a module implementing"
+      assert error.message =~ "config :ash_metrics, tenant_source: MyApp.Tenants"
+      assert error.message =~ "got: nil"
+    end
+
+    test "raises when it is not a module" do
+      Application.put_env(:ash_metrics, :tenant_source, "MyApp.Tenants")
+
+      error = assert_raise ArgumentError, fn -> Config.tenant_source!() end
+
+      assert error.message =~ ~s(got: "MyApp.Tenants")
     end
   end
 

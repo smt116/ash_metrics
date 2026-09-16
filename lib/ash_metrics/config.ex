@@ -14,6 +14,12 @@ defmodule AshMetrics.Config do
         tag_extractor: AshMetrics.TagExtractor.Default,
         backend: AshMetrics.Backend.Noop
 
+  `tenant_source` has no default and is not required either: it is needed only
+  by an application whose resources use Ash's `:context` multitenancy strategy
+  and declare gauges.
+
+      config :ash_metrics, tenant_source: MyApp.Tenants
+
   The values are read on each call rather than captured in a module attribute,
   so that a host application can override them from `config/runtime.exs` for
   everything except `prefix`, which a compile-time verifier requires.
@@ -103,4 +109,44 @@ defmodule AshMetrics.Config do
   """
   @spec backend() :: module()
   def backend, do: Application.get_env(@app, :backend, AshMetrics.Backend.Noop)
+
+  @doc """
+  The configured `AshMetrics.TenantSource`, or `nil` when there is none.
+
+  There is no default: only an application whose resources use Ash's
+  `:context` multitenancy strategy needs one, and no default could enumerate
+  its tenants.
+  """
+  @spec tenant_source() :: module() | nil
+  def tenant_source, do: Application.get_env(@app, :tenant_source)
+
+  @doc """
+  The configured `AshMetrics.TenantSource`, raising when there is none.
+
+  Raises rather than returning an empty list of tenants, because a gauge on a
+  `:context` multitenant resource that is polled for no tenants emits nothing
+  at all, which is indistinguishable from a working metric whose value is zero.
+  """
+  @spec tenant_source!() :: module()
+  def tenant_source! do
+    case tenant_source() do
+      module when is_atom(module) and not is_nil(module) ->
+        module
+
+      other ->
+        raise ArgumentError, """
+        `tenant_source` must be set to a module implementing \
+        `AshMetrics.TenantSource` in the configuration of #{inspect(@app)}, \
+        got: #{inspect(other)}.
+
+        Add this to `config/config.exs`:
+
+            config :ash_metrics, tenant_source: MyApp.Tenants
+
+        A gauge on a resource using Ash's `:context` multitenancy strategy is
+        polled once per tenant, and only the application can say which
+        tenants exist.
+        """
+    end
+  end
 end

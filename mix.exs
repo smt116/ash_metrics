@@ -66,13 +66,15 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Dsl.Gauge,
           AshMetrics.Info,
           AshMetrics.Verifiers.VerifyMetrics,
-          AshMetrics.Verifiers.VerifyPrefix
+          AshMetrics.Verifiers.VerifyPrefix,
+          AshMetrics.Verifiers.VerifyTenantSource
         ],
         Behaviours: [
           AshMetrics.Backend,
           AshMetrics.Gauge.Strategy,
           AshMetrics.NameBuilder,
-          AshMetrics.TagExtractor
+          AshMetrics.TagExtractor,
+          AshMetrics.TenantSource
         ],
         Defaults: [
           AshMetrics.Backend.Noop,

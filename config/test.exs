@@ -1,6 +1,9 @@
 import Config
 
-config :ash_metrics, prefix: "test", otp_app: :ash_metrics
+config :ash_metrics,
+  prefix: "test",
+  otp_app: :ash_metrics,
+  tenant_source: AshMetrics.Test.Tenants
 
 config :ash_metrics, ash_domains: [AshMetrics.Test.Mailings, AshMetrics.Test.Queue]
 
