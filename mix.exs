@@ -18,7 +18,9 @@ defmodule AshMetrics.MixProject do
       dialyzer: [
         plt_core_path: "priv/plts",
         plt_file: {:no_warn, "priv/plts/ash_metrics.plt"},
-        plt_add_apps: [:mix]
+        # `:ex_unit` is needed by `AshMetrics.Test`, which ships in `lib` so
+        # that consumers can use it, but only ever runs under ExUnit.
+        plt_add_apps: [:ex_unit, :mix]
       ]
     ]
   end
