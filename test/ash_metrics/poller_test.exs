@@ -17,6 +17,7 @@ defmodule AshMetrics.PollerTest do
 
   alias AshMetrics.Poller
   alias AshMetrics.PollerTest.Manual
+  alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
@@ -40,6 +41,7 @@ defmodule AshMetrics.PollerTest do
                {Job, :backlog},
                {Job, :total},
                {TenantJob, :backlog},
+               {GlobalTenantJob, :backlog},
                {SchemaJob, :backlog}
              ]
     end

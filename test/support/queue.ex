@@ -7,6 +7,7 @@ defmodule AshMetrics.Test.Queue do
   resources do
     resource AshMetrics.Test.Job
     resource AshMetrics.Test.TenantJob
+    resource AshMetrics.Test.GlobalTenantJob
     resource AshMetrics.Test.SchemaJob
   end
 end

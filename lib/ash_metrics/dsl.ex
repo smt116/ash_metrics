@@ -131,9 +131,10 @@ defmodule AshMetrics.Dsl do
 
     The default `:count` strategy runs one query to learn which groups exist
     and then one count per group, because Ash has no `GROUP BY`. That is
-    `1 + groups` queries per period, per tenant for a `:context` multitenant
-    resource. A resource whose backlog is expensive to count exactly can
-    supply its own `AshMetrics.Gauge.Strategy` instead.
+    `1 + groups` queries per period, and that again for every tenant of a
+    resource that has to be polled per tenant. A resource whose backlog is
+    expensive to count exactly can supply its own `AshMetrics.Gauge.Strategy`
+    instead.
     """,
     examples: [
       "gauge :backlog, filter: expr(status == :pending)",

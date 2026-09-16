@@ -9,9 +9,9 @@ defmodule AshMetrics.Gauge.Strategy.Count do
 
   Ash has no `GROUP BY`. A grouped gauge is therefore one read of the distinct
   values of its `group_by` attributes, to learn which groups exist, followed by
-  one `Ash.count/2` per group: `1 + groups` queries per poll, and per tenant
-  for a resource using the `:context` multitenancy strategy. A gauge with no
-  `group_by` is a single count.
+  one `Ash.count/2` per group: `1 + groups` queries per poll, and once per
+  tenant for a resource `AshMetrics.Gauge.Runner` polls per tenant. A gauge
+  with no `group_by` is a single count.
 
   That is the price of an exact number. A resource where it is too expensive
   can declare its own `AshMetrics.Gauge.Strategy` — an estimate from the

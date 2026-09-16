@@ -1,8 +1,7 @@
-defmodule AshMetrics.Test.TenantJob do
+defmodule AshMetrics.Test.GlobalTenantJob do
   @moduledoc false
-  # Attribute multitenancy in its usual shape: one table, one tenant
-  # attribute, and no `global? true`, so Ash refuses a read that names no
-  # tenant and a gauge has to be polled once per tenant.
+  # Attribute multitenancy with `global? true`, which lets a gauge read across
+  # every tenant in one query grouped by the tenant attribute.
   use Ash.Resource,
     domain: AshMetrics.Test.Queue,
     data_layer: Ash.DataLayer.Ets,
@@ -12,12 +11,13 @@ defmodule AshMetrics.Test.TenantJob do
     gauge :backlog,
       filter: expr(status in [:pending, :processing]),
       group_by: [:status],
-      description: "Jobs waiting to be picked up, per tenant"
+      description: "Jobs waiting to be picked up, across every tenant"
   end
 
   multitenancy do
     strategy :attribute
     attribute :org
+    global? true
   end
 
   attributes do
@@ -27,7 +27,6 @@ defmodule AshMetrics.Test.TenantJob do
       public?: true,
       constraints: [one_of: [:pending, :processing, :done, :failed]]
 
-    attribute :provider, :string, public?: true
     attribute :org, :string, public?: true
   end
 

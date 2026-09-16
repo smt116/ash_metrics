@@ -4,6 +4,7 @@ defmodule AshMetrics.Verifiers.VerifyTenantSourceTest do
   use ExUnit.Case, async: false
 
   alias AshMetrics.Test.Compiler
+  alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.SchemaCounter
   alias AshMetrics.Test.SchemaJob
@@ -27,6 +28,7 @@ defmodule AshMetrics.Verifiers.VerifyTenantSourceTest do
 
       assert message =~ "`tenant_source` must be set to a module implementing"
       assert message =~ "config :ash_metrics, tenant_source: MyApp.Tenants"
+      assert message =~ "each tenant's rows live in their own schema"
       assert message =~ "polled once per tenant"
     end
 
@@ -34,8 +36,18 @@ defmodule AshMetrics.Verifiers.VerifyTenantSourceTest do
       assert Compiler.dsl_errors_for(SchemaCounter) == []
     end
 
-    test "an :attribute multitenant resource declaring a gauge is accepted" do
-      assert Compiler.dsl_errors_for(TenantJob) == []
+    test "an :attribute multitenant resource declaring a gauge is rejected" do
+      assert [%DslError{path: [:metrics]} = error] = Compiler.dsl_errors_for(TenantJob)
+
+      message = Exception.message(error)
+
+      assert message =~ "`tenant_source` must be set to a module implementing"
+      assert message =~ "without `global? true`"
+      assert message =~ "polled once per tenant"
+    end
+
+    test "a global :attribute multitenant resource declaring a gauge is accepted" do
+      assert Compiler.dsl_errors_for(GlobalTenantJob) == []
     end
 
     test "a single tenant resource declaring a gauge is accepted" do
@@ -43,7 +55,8 @@ defmodule AshMetrics.Verifiers.VerifyTenantSourceTest do
     end
   end
 
-  test "a :context multitenant resource is accepted once a source is configured" do
+  test "a resource polled per tenant is accepted once a source is configured" do
     assert Compiler.dsl_errors_for(SchemaJob) == []
+    assert Compiler.dsl_errors_for(TenantJob) == []
   end
 end

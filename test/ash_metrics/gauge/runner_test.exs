@@ -35,6 +35,7 @@ defmodule AshMetrics.Gauge.RunnerTest do
   alias AshMetrics.Gauge.RunnerTest.FailingForOneTenant
   alias AshMetrics.Info
   alias AshMetrics.Test.Ets
+  alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
@@ -51,6 +52,7 @@ defmodule AshMetrics.Gauge.RunnerTest do
         AshMetrics.event_name(Job, :backlog),
         AshMetrics.event_name(Job, :total),
         AshMetrics.event_name(TenantJob, :backlog),
+        AshMetrics.event_name(GlobalTenantJob, :backlog),
         AshMetrics.event_name(SchemaJob, :backlog)
       ],
       &__MODULE__.handle_event/4,
@@ -111,15 +113,68 @@ defmodule AshMetrics.Gauge.RunnerTest do
   end
 
   describe "emit/3 with attribute multitenancy" do
-    test "emits one value per tenant in a single poll" do
+    test "polls every tenant of the configured source, one poll each" do
       backlog = Info.metric!(TenantJob, :backlog)
 
-      seed(TenantJob, status: :pending, org: "acme")
-      seed(TenantJob, status: :processing, org: "acme")
-      seed(TenantJob, status: :pending, org: "globex")
-      seed(TenantJob, status: :done, org: "globex")
+      seed(TenantJob, [status: :pending], "tenant_a")
+      seed(TenantJob, [status: :processing], "tenant_a")
+      seed(TenantJob, [status: :pending], "tenant_b")
+      seed(TenantJob, [status: :done], "tenant_b")
 
       assert {:ok, groups} = Runner.emit(TenantJob, backlog)
+
+      assert Enum.sort(groups) == [
+               %{status: :pending, tenant: "tenant_a"},
+               %{status: :pending, tenant: "tenant_b"},
+               %{status: :processing, tenant: "tenant_a"}
+             ]
+
+      assert emitted(TenantJob, :backlog) == [
+               {%{status: :pending, tenant: "tenant_a"}, 1},
+               {%{status: :pending, tenant: "tenant_b"}, 1},
+               {%{status: :processing, tenant: "tenant_a"}, 1}
+             ]
+    end
+
+    test "zeroes a group that vanished for one tenant only" do
+      backlog = Info.metric!(TenantJob, :backlog)
+
+      drained = seed(TenantJob, [status: :pending], "tenant_a")
+      seed(TenantJob, [status: :pending], "tenant_b")
+
+      assert {:ok, groups} = Runner.emit(TenantJob, backlog)
+      assert length(emitted(TenantJob, :backlog)) == 2
+
+      Ash.destroy!(drained, authorize?: false, tenant: "tenant_a")
+
+      assert Runner.emit(TenantJob, backlog, groups) ==
+               {:ok, [%{status: :pending, tenant: "tenant_b"}]}
+
+      assert emitted(TenantJob, :backlog) == [
+               {%{status: :pending, tenant: "tenant_a"}, 0},
+               {%{status: :pending, tenant: "tenant_b"}, 1}
+             ]
+    end
+
+    test "raises when no tenant source is configured" do
+      without_tenant_source()
+
+      assert_raise ArgumentError, ~r/`tenant_source` must be set/, fn ->
+        Runner.emit(TenantJob, Info.metric!(TenantJob, :backlog))
+      end
+    end
+  end
+
+  describe "emit/3 with global attribute multitenancy" do
+    test "emits one value per tenant in a single poll" do
+      backlog = Info.metric!(GlobalTenantJob, :backlog)
+
+      seed(GlobalTenantJob, status: :pending, org: "acme")
+      seed(GlobalTenantJob, status: :processing, org: "acme")
+      seed(GlobalTenantJob, status: :pending, org: "globex")
+      seed(GlobalTenantJob, status: :done, org: "globex")
+
+      assert {:ok, groups} = Runner.emit(GlobalTenantJob, backlog)
 
       assert Enum.sort(groups) == [
                %{status: :pending, tenant: "acme"},
@@ -127,7 +182,7 @@ defmodule AshMetrics.Gauge.RunnerTest do
                %{status: :processing, tenant: "acme"}
              ]
 
-      assert emitted(TenantJob, :backlog) == [
+      assert emitted(GlobalTenantJob, :backlog) == [
                {%{status: :pending, tenant: "acme"}, 1},
                {%{status: :pending, tenant: "globex"}, 1},
                {%{status: :processing, tenant: "acme"}, 1}
@@ -135,11 +190,20 @@ defmodule AshMetrics.Gauge.RunnerTest do
     end
 
     test "keeps the tenant attribute under its own name when it is declared" do
-      backlog = %{Info.metric!(TenantJob, :backlog) | group_by: [:org]}
+      backlog = %{Info.metric!(GlobalTenantJob, :backlog) | group_by: [:org]}
 
-      seed(TenantJob, status: :pending, org: "acme")
+      seed(GlobalTenantJob, status: :pending, org: "acme")
 
-      assert Runner.emit(TenantJob, backlog) == {:ok, [%{org: "acme", tenant: "acme"}]}
+      assert Runner.emit(GlobalTenantJob, backlog) == {:ok, [%{org: "acme", tenant: "acme"}]}
+    end
+
+    test "needs no tenant source" do
+      without_tenant_source()
+
+      seed(GlobalTenantJob, status: :pending, org: "acme")
+
+      assert Runner.emit(GlobalTenantJob, Info.metric!(GlobalTenantJob, :backlog)) ==
+               {:ok, [%{status: :pending, tenant: "acme"}]}
     end
   end
 
@@ -167,14 +231,10 @@ defmodule AshMetrics.Gauge.RunnerTest do
     end
 
     test "raises when no tenant source is configured" do
-      backlog = Info.metric!(SchemaJob, :backlog)
-      original = Application.get_env(:ash_metrics, :tenant_source)
-      Application.delete_env(:ash_metrics, :tenant_source)
-
-      on_exit(fn -> Application.put_env(:ash_metrics, :tenant_source, original) end)
+      without_tenant_source()
 
       assert_raise ArgumentError, ~r/`tenant_source` must be set/, fn ->
-        Runner.emit(SchemaJob, backlog)
+        Runner.emit(SchemaJob, Info.metric!(SchemaJob, :backlog))
       end
     end
   end
@@ -241,6 +301,13 @@ defmodule AshMetrics.Gauge.RunnerTest do
 
   defp seed(resource, attrs, tenant \\ nil) do
     Ash.create!(resource, Map.new(attrs), authorize?: false, tenant: tenant)
+  end
+
+  defp without_tenant_source do
+    original = Application.get_env(:ash_metrics, :tenant_source)
+    Application.delete_env(:ash_metrics, :tenant_source)
+
+    on_exit(fn -> Application.put_env(:ash_metrics, :tenant_source, original) end)
   end
 
   # Every emission received so far, sorted, so that the order the data layer

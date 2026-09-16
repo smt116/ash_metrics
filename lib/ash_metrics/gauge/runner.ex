@@ -11,19 +11,24 @@ defmodule AshMetrics.Gauge.Runner do
 
   ## Multitenancy
 
-  The three shapes Ash allows are handled differently, because they are
-  different questions:
+  What Ash allows is handled differently case by case, because the cases are
+  different questions. Every emission carries the tenant as the `tenant` tag
+  either way, so nothing downstream has to know which case a resource is.
 
   * A resource with no multitenancy is polled once.
-  * A resource using the `:attribute` strategy is polled once as well, with its
-    tenant attribute appended to the gauge's grouping. One query therefore
-    covers every tenant, and the attribute's value is emitted as the `tenant`
-    tag. The attribute is left in the tags under its own name too when the
-    resource declared it in `group_by` itself.
-  * A resource using the `:context` strategy is polled once per tenant of the
-    configured `AshMetrics.TenantSource`, since each tenant's rows live in
-    their own schema, and each emission carries that tenant as the `tenant`
-    tag.
+  * A resource using the `:attribute` strategy with `global? true` is polled
+    once as well, with its tenant attribute appended to the gauge's grouping.
+    One query therefore covers every tenant, and the attribute's value is
+    emitted as the `tenant` tag. The attribute is left in the tags under its
+    own name too when the resource declared it in `group_by` itself.
+  * A resource using the `:attribute` strategy without `global? true` is polled
+    once per tenant of the configured `AshMetrics.TenantSource`, each poll
+    naming its tenant, because Ash refuses a read of such a resource that names
+    no tenant. Turning `global?` on to save the extra queries would widen
+    tenantless reads for the whole application, which is not a trade a metric
+    should ask anyone to make.
+  * A resource using the `:context` strategy is polled once per tenant as well,
+    since each tenant's rows live in their own schema.
 
   ## Groups that vanish
 
@@ -80,20 +85,24 @@ defmodule AshMetrics.Gauge.Runner do
     case ResourceInfo.multitenancy_strategy(resource) do
       nil -> compute(resource, gauge, gauge, nil, &Function.identity/1)
       :attribute -> poll_attribute(resource, gauge)
-      :context -> poll_context(resource, gauge)
+      :context -> poll_per_tenant(resource, gauge)
     end
   end
 
   @spec poll_attribute(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
   defp poll_attribute(resource, %Gauge{} = gauge) do
-    attribute = ResourceInfo.multitenancy_attribute(resource)
-    grouped = %{gauge | group_by: group_by(gauge, attribute)}
+    if ResourceInfo.multitenancy_global?(resource) do
+      attribute = ResourceInfo.multitenancy_attribute(resource)
+      grouped = %{gauge | group_by: group_by(gauge, attribute)}
 
-    compute(resource, gauge, grouped, nil, &as_tenant(&1, attribute, gauge.group_by))
+      compute(resource, gauge, grouped, nil, &as_tenant(&1, attribute, gauge.group_by))
+    else
+      poll_per_tenant(resource, gauge)
+    end
   end
 
-  @spec poll_context(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
-  defp poll_context(resource, %Gauge{} = gauge) do
+  @spec poll_per_tenant(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
+  defp poll_per_tenant(resource, %Gauge{} = gauge) do
     Enum.reduce_while(Config.tenant_source!().list_tenants(), {:ok, []}, fn tenant, {:ok, all} ->
       case compute(resource, gauge, gauge, tenant, &Map.put(&1, :tenant, tenant)) do
         {:ok, groups} -> {:cont, {:ok, all ++ groups}}

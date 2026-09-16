@@ -11,6 +11,7 @@ defmodule AshMetrics.Test.Ets do
   # the tables are named after the resource and are shared by the whole node.
 
   alias Ash.DataLayer.Ets
+  alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
@@ -20,6 +21,7 @@ defmodule AshMetrics.Test.Ets do
   def clear! do
     clear!(Job)
     clear!(TenantJob)
+    clear!(GlobalTenantJob)
 
     Enum.each(Tenants.list_tenants(), &clear!(SchemaJob, &1))
   end

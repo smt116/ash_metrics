@@ -161,22 +161,26 @@ after it drained, which is exactly when someone is looking at it.
 
 ### Multitenancy
 
-Ash's two multitenancy strategies are handled differently, but a gauge is
-tagged with `tenant` either way:
+Multitenant resources are polled differently depending on what Ash will let a
+query do, but a gauge is tagged with `tenant` either way:
 
-- `:attribute` — the tenant is one of the resource's own attributes, so one
-  query covers every tenant. Nothing needs configuring. The resource does need
-  `global? true` in its `multitenancy` block, since Ash otherwise refuses a
-  read that names no tenant.
+- `:attribute` with `global? true` — one query covers every tenant, grouped by
+  the tenant attribute. Nothing needs configuring.
+- `:attribute` without `global? true` — Ash refuses a read that names no
+  tenant, so the gauge is polled once per tenant of the configured
+  `tenant_source`, a module implementing `AshMetrics.TenantSource`. AshMetrics
+  will not ask you to turn `global?` on to save the queries: that widens
+  tenantless reads for your whole application, which is not a trade to make
+  for a metric.
 - `:context` — each tenant's rows live in their own schema, so the gauge is
-  polled once per tenant of the configured `tenant_source`, a module
-  implementing `AshMetrics.TenantSource`. A compile-time verifier rejects a
-  `:context` multitenant resource that declares a gauge while the key is
-  unset, because such a gauge would otherwise be polled for nobody and emit
-  nothing.
+  polled once per tenant of the same `tenant_source`.
 
-Note the multiplier: a `:context` gauge costs its queries once per tenant per
-period.
+A compile-time verifier rejects a resource that has to be polled per tenant
+and declares a gauge while `tenant_source` is unset, because such a gauge
+would otherwise be polled for nobody and emit nothing.
+
+Note the multiplier: a gauge polled per tenant costs its queries once per
+tenant per period.
 
 ## Wiring into your reporter
 

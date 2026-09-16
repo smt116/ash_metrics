@@ -16,7 +16,7 @@ and this project adheres to
   metric names, non-empty unique outcomes, unique tag keys that do not collide
   with reserved ones, strictly ascending positive buckets, gauges grouping by
   attributes of their resource, and a configured `tenant_source` for a
-  `:context` multitenant resource declaring a gauge.
+  resource declaring a gauge that has to be polled per tenant.
 - `AshMetrics.increment/3` and `AshMetrics.observe/4`, which validate the
   metric, outcome and tag keys at the call site before emitting.
 - `AshMetrics.metrics/0` and `AshMetrics.metrics_for/1`, which compile the
@@ -29,7 +29,7 @@ and this project adheres to
 - `AshMetrics.Gauge.Strategy` behaviour, with `AshMetrics.Gauge.Strategy.Count`,
   which counts each group exactly.
 - `AshMetrics.TenantSource` behaviour, for enumerating the tenants of a
-  `:context` multitenant resource.
+  resource whose gauges are polled once per tenant.
 - `AshMetrics.Gauge.Runner`, which polls one gauge, emits one value per group
   and per tenant, and emits a single zero for a group that has vanished.
 - `AshMetrics.Poller` behaviour, with `AshMetrics.Poller.GenServer`, which
