@@ -37,6 +37,10 @@ defmodule AshMetrics do
         metadata: changeset.context
       )
 
+  What the host application consumes is `metrics/0`: the declarations of every
+  resource, compiled to `Telemetry.Metrics` definitions, ready to be spliced
+  into whatever reporter it already runs.
+
   See `AshMetrics.Dsl` for the section definition and `AshMetrics.Info` for
   introspection.
   """
@@ -48,10 +52,12 @@ defmodule AshMetrics do
       AshMetrics.Verifiers.VerifyMetrics
     ]
 
+  alias Ash.Domain.Info, as: DomainInfo
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Info
+  alias AshMetrics.NameBuilder
   alias AshMetrics.TagExtractor
 
   @typedoc "Tag keys and values attached to an emission."
@@ -227,6 +233,107 @@ defmodule AshMetrics do
               "#{inspect(key)} is not a declared tag of #{kind(metric)} " <>
                 "#{inspect(metric.name)} on #{inspect(resource)}. Declared tags: " <>
                 list(metric.tags)
+    end
+  end
+
+  @doc """
+  The `Telemetry.Metrics` definitions of every resource that declares metrics.
+
+  The resources are found through the Ash domains of the configured
+  `AshMetrics.Config.otp_app!/0`, so a resource that is not reachable from a
+  configured domain is not included. Pass an explicit list to `metrics_for/1`
+  if that is not what you want.
+  """
+  @spec metrics() :: [Telemetry.Metrics.t()]
+  def metrics do
+    Config.otp_app!()
+    |> Ash.Info.domains()
+    |> Enum.flat_map(&DomainInfo.resources/1)
+    |> metrics_for()
+  end
+
+  @doc """
+  The `Telemetry.Metrics` definitions of the given resources.
+
+  Named `metrics_for/1` rather than `metrics/1` because the `metrics` section
+  builder this module generates for the DSL already occupies `metrics/1`.
+
+  Resources that do not use the `AshMetrics` extension are skipped rather than
+  rejected, so a list of every resource in an application can be passed without
+  filtering it first.
+
+  A counter becomes a `Telemetry.Metrics.Counter` named `<metric>.count` and a
+  distribution a `Telemetry.Metrics.Distribution` named `<metric>.duration`,
+  where the part before the suffix is what the configured
+  `AshMetrics.NameBuilder` returns. Each definition's tags are the declared tags
+  plus the keys the configured `AshMetrics.TagExtractor` supplies, plus the
+  outcome tag for a counter, which is exactly the set of keys an emission can
+  carry.
+
+  Finally, the configured backend gets a chance to rewrite the list through
+  `c:AshMetrics.Backend.transform_metrics/2`, if it implements that optional
+  callback.
+
+  Splice the result into a reporter:
+
+      children = [
+        {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()}
+      ]
+  """
+  @spec metrics_for([module()]) :: [Telemetry.Metrics.t()]
+  def metrics_for(resources) do
+    extractor_keys = Config.tag_extractor().tag_keys()
+
+    resources
+    |> Enum.filter(&declares_metrics?/1)
+    |> Enum.flat_map(fn resource ->
+      Enum.map(Info.metrics(resource), &definition(resource, &1, extractor_keys))
+    end)
+    |> transform()
+  end
+
+  @spec declares_metrics?(module()) :: boolean()
+  defp declares_metrics?(resource), do: __MODULE__ in Spark.extensions(resource)
+
+  @spec definition(module(), Counter.t() | Distribution.t(), [atom()]) ::
+          Telemetry.Metrics.t()
+  defp definition(resource, %Counter{} = counter, extractor_keys) do
+    Telemetry.Metrics.counter(
+      NameBuilder.build(resource, counter.name) <> ".count",
+      event_name: event_name(resource, counter.name),
+      measurement: :count,
+      tags: [Config.outcome_tag() | counter.tags] ++ extractor_keys,
+      description: counter.description
+    )
+  end
+
+  defp definition(resource, %Distribution{} = distribution, extractor_keys) do
+    Telemetry.Metrics.distribution(
+      NameBuilder.build(resource, distribution.name) <> ".duration",
+      [
+        event_name: event_name(resource, distribution.name),
+        measurement: :value,
+        unit: distribution.unit,
+        tags: distribution.tags ++ extractor_keys,
+        description: distribution.description
+      ] ++ reporter_options(distribution)
+    )
+  end
+
+  @spec reporter_options(Distribution.t()) :: keyword()
+  defp reporter_options(%Distribution{buckets: nil}), do: []
+
+  defp reporter_options(%Distribution{buckets: buckets}),
+    do: [reporter_options: [buckets: buckets]]
+
+  @spec transform([Telemetry.Metrics.t()]) :: [Telemetry.Metrics.t()]
+  defp transform(metrics) do
+    backend = Config.backend()
+
+    if Code.ensure_loaded?(backend) and function_exported?(backend, :transform_metrics, 2) do
+      backend.transform_metrics(metrics, [])
+    else
+      metrics
     end
   end
 
