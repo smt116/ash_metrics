@@ -12,7 +12,8 @@ defmodule AshMetrics.Config do
         outcome_tag: :outcome,
         name_builder: AshMetrics.NameBuilder.Default,
         tag_extractor: AshMetrics.TagExtractor.Default,
-        backend: AshMetrics.Backend.Noop
+        backend: AshMetrics.Backend.Noop,
+        poller: AshMetrics.Poller.GenServer
 
   `tenant_source` has no default and is not required either: it is needed only
   by an application whose resources use Ash's `:context` multitenancy strategy
@@ -109,6 +110,12 @@ defmodule AshMetrics.Config do
   """
   @spec backend() :: module()
   def backend, do: Application.get_env(@app, :backend, AshMetrics.Backend.Noop)
+
+  @doc """
+  The `AshMetrics.Poller` implementation that polls the declared gauges.
+  """
+  @spec poller() :: module()
+  def poller, do: Application.get_env(@app, :poller, AshMetrics.Poller.GenServer)
 
   @doc """
   The configured `AshMetrics.TenantSource`, or `nil` when there is none.

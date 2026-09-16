@@ -73,6 +73,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend,
           AshMetrics.Gauge.Strategy,
           AshMetrics.NameBuilder,
+          AshMetrics.Poller,
           AshMetrics.TagExtractor,
           AshMetrics.TenantSource
         ],
@@ -80,6 +81,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend.Noop,
           AshMetrics.Gauge.Strategy.Count,
           AshMetrics.NameBuilder.Default,
+          AshMetrics.Poller.GenServer,
           AshMetrics.TagExtractor.Default
         ],
         Testing: [

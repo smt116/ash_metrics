@@ -16,6 +16,7 @@ defmodule AshMetrics.ConfigTest do
           :name_builder,
           :tag_extractor,
           :backend,
+          :poller,
           :tenant_source
         ],
         fn key ->
@@ -149,6 +150,10 @@ defmodule AshMetrics.ConfigTest do
     test "backend/0 defaults to the noop backend" do
       assert Config.backend() == AshMetrics.Backend.Noop
     end
+
+    test "poller/0 defaults to the bundled GenServer poller" do
+      assert Config.poller() == AshMetrics.Poller.GenServer
+    end
   end
 
   describe "overrides" do
@@ -174,6 +179,12 @@ defmodule AshMetrics.ConfigTest do
       Application.put_env(:ash_metrics, :backend, MyApp.Backend)
 
       assert Config.backend() == MyApp.Backend
+    end
+
+    test "poller/0 can be overridden" do
+      Application.put_env(:ash_metrics, :poller, MyApp.Poller)
+
+      assert Config.poller() == MyApp.Poller
     end
   end
 end

@@ -259,11 +259,22 @@ defmodule AshMetrics do
   if that is not what you want.
   """
   @spec metrics() :: [Telemetry.Metrics.t()]
-  def metrics do
+  def metrics, do: metrics_for(resources())
+
+  @doc """
+  Every resource of the configured application's Ash domains that declares
+  metrics.
+
+  Shared by `metrics/0` and `AshMetrics.Poller.child_specs/1`, so that what a
+  reporter is told about and what is polled can never be two different sets of
+  resources.
+  """
+  @spec resources() :: [module()]
+  def resources do
     Config.otp_app!()
     |> Ash.Info.domains()
     |> Enum.flat_map(&DomainInfo.resources/1)
-    |> metrics_for()
+    |> Enum.filter(&declares_metrics?/1)
   end
 
   @doc """
