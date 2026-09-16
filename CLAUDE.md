@@ -41,7 +41,14 @@ These are decisions already made. Do not relitigate them in code.
   `outcomes:` in the DSL compiles to a compile-time-validated tag-value set.
 - **`prefix` is required configuration, never derived.** Deriving it from
   `otp_app` is unreliable at compile time and in releases, and a wrong metric
-  name is a permanent broken contract. A verifier raises when it is absent.
+  name is a permanent broken contract. A verifier rejects the resource when it
+  is absent.
+- **Verifier failures are compiler warnings, not errors.** Spark catches a
+  verifier's `DslError` and reports it through `IO.warn` with the declaration's
+  location; `mix compile` still succeeds unless `--warnings-as-errors` is on.
+  Do not document them as hard compile errors. Tests for verifiers therefore go
+  through `Spark.Test.dsl_errors/1` (see `test/support/compiler.ex`), not
+  `assert_raise`.
 - **`before_action`/`after_action` telemetry is never a metrics source.** Ash's
   own docs warn against it: the cardinality is extremely high and there is no
   name to distinguish instances.

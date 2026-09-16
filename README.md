@@ -49,8 +49,8 @@ config :ash_metrics,
 ```
 
 `prefix` must be set in compile-time configuration — `config/config.exs`, not
-`config/runtime.exs` alone. A compile-time verifier refuses to build a resource
-that declares metrics unless it is configured; the metric names themselves are
+`config/runtime.exs` alone. A compile-time verifier rejects a resource that
+declares metrics unless it is configured; the metric names themselves are
 built when `AshMetrics.metrics/0` runs. It is required rather than derived from
 `otp_app` because looking up the owning application at compile time is
 unreliable, and a metric name is a permanent contract that cannot be quietly
@@ -114,6 +114,15 @@ refuses to stringify a struct into a tag value.
 
 An outcome that was not declared, or a tag key that was not allowed, raises
 rather than emitting.
+
+The declarations themselves are checked while the resource compiles: metric
+names must be unique, a counter needs at least one outcome and no duplicates,
+tag keys must be unique and must not collide with the outcome tag or with the
+keys the tag extractor adds, and buckets must be strictly ascending positive
+numbers. Spark reports a failed check as a compiler warning that points at the
+offending declaration, not as a hard error, so compile with
+`mix compile --warnings-as-errors` in CI if a bad declaration should fail the
+build.
 
 See the [DSL reference](documentation/dsls/DSL-AshMetrics.md) for every option.
 

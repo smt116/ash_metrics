@@ -1,10 +1,14 @@
 defmodule AshMetrics.Verifiers.VerifyPrefix do
   @moduledoc """
-  Refuses to compile a resource that declares metrics while `prefix` is unset.
+  Rejects a resource that declares metrics while `prefix` is unset.
 
   Every metric name this package produces starts with the configured prefix. A
   missing prefix would otherwise surface weeks later as an empty dashboard
-  rather than as a build failure, so it is checked while the resource compiles.
+  rather than at build time, so it is checked while the resource compiles.
+
+  Like every Spark verifier, a failure is reported by the compiler as a
+  warning pointing at the resource, not as a hard error. Compile with
+  `--warnings-as-errors` to turn it into one.
   """
 
   use Spark.Dsl.Verifier
