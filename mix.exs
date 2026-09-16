@@ -70,11 +70,13 @@ defmodule AshMetrics.MixProject do
         ],
         Behaviours: [
           AshMetrics.Backend,
+          AshMetrics.Gauge.Strategy,
           AshMetrics.NameBuilder,
           AshMetrics.TagExtractor
         ],
         Defaults: [
           AshMetrics.Backend.Noop,
+          AshMetrics.Gauge.Strategy.Count,
           AshMetrics.NameBuilder.Default,
           AshMetrics.TagExtractor.Default
         ],

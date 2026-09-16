@@ -31,4 +31,15 @@ defmodule AshMetrics.Dsl.Gauge do
           description: String.t() | nil,
           __spark_metadata__: Spark.Dsl.Entity.spark_meta() | nil
         }
+
+  @doc """
+  The `AshMetrics.Gauge.Strategy` module that computes a gauge's value.
+
+  Resolves the built-in `:count` to `AshMetrics.Gauge.Strategy.Count`, and is
+  the only place that mapping is made, so that a declaration and a poll always
+  agree on which strategy a gauge means.
+  """
+  @spec strategy_module(t()) :: module()
+  def strategy_module(%__MODULE__{strategy: :count}), do: AshMetrics.Gauge.Strategy.Count
+  def strategy_module(%__MODULE__{strategy: strategy}), do: strategy
 end

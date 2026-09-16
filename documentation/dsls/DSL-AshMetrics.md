@@ -210,7 +210,7 @@ end
 |------|------|---------|------|
 | [`filter`](#metrics-gauge-filter){: #metrics-gauge-filter } | `any` |  | An Ash expression, built with `expr/1`, restricting what is counted. Counts every row when absent. |
 | [`group_by`](#metrics-gauge-group_by){: #metrics-gauge-group_by } | `list(atom)` | `[]` | Attributes of the resource to break the value down by. Their values are the tags of each emission. |
-| [`strategy`](#metrics-gauge-strategy){: #metrics-gauge-strategy } | `:count \| atom` | `:count` | `:count` for an exact count, or a module implementing the gauge strategy behaviour. |
+| [`strategy`](#metrics-gauge-strategy){: #metrics-gauge-strategy } | `:count \| module` | `:count` | `:count` for an exact count, or an `AshMetrics.Gauge.Strategy` module computing the value some other way. |
 | [`period`](#metrics-gauge-period){: #metrics-gauge-period } | `pos_integer` | `60000` | How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution, since most collectors flush on a ten second interval anyway and every poll costs queries. |
 | [`description`](#metrics-gauge-description){: #metrics-gauge-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 

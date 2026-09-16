@@ -6,3 +6,6 @@ config :ash_metrics, ash_domains: [AshMetrics.Test.Mailings, AshMetrics.Test.Que
 
 # Required by Ash to compile the resources in `test/support`.
 config :ash, default_string_length_count: :codepoints
+
+# Ash logs every create at debug level, and the gauge tests seed a lot of rows.
+config :logger, level: :warning

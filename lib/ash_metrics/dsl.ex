@@ -167,9 +167,10 @@ defmodule AshMetrics.Dsl do
           "Attributes of the resource to break the value down by. Their values are the tags of each emission."
       ],
       strategy: [
-        type: {:or, [{:literal, :count}, :atom]},
+        type: {:or, [{:literal, :count}, {:behaviour, AshMetrics.Gauge.Strategy}]},
         default: :count,
-        doc: "`:count` for an exact count, or a module implementing the gauge strategy behaviour."
+        doc:
+          "`:count` for an exact count, or an `AshMetrics.Gauge.Strategy` module computing the value some other way."
       ],
       period: [
         type: :pos_integer,
