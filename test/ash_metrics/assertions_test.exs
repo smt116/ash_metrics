@@ -4,12 +4,17 @@ defmodule AshMetrics.AssertionsTest do
   use AshMetrics.Test
 
   alias AshMetrics.Backend
+  alias AshMetrics.Gauge.Runner
+  alias AshMetrics.Info
   alias AshMetrics.Test.Delivery
+  alias AshMetrics.Test.Ets
   alias AshMetrics.Test.Invoice
+  alias AshMetrics.Test.Job
 
   @delivery "test.mailings.templated_delivery.delivery"
   @send_latency "test.mailings.templated_delivery.send_latency"
   @capture "test.mailings.invoice.capture"
+  @backlog "test.queue.job.backlog"
 
   describe "AshMetrics.Backend.Test" do
     test "starts nothing" do
@@ -105,6 +110,31 @@ defmodule AshMetrics.AssertionsTest do
 
       assert {%{count: 1}, %{outcome: :failed}} =
                assert_metric_emitted(@capture, outcome: :failed)
+    end
+  end
+
+  describe "a polled gauge" do
+    setup do
+      Ets.clear!()
+      on_exit(&Ets.clear!/0)
+
+      :ok
+    end
+
+    test "is matched by name, with the group as its tags" do
+      Ash.create!(Job, %{status: :pending, provider: "ses"}, authorize?: false)
+      Ash.create!(Job, %{status: :pending, provider: "ses"}, authorize?: false)
+
+      Runner.emit(Job, Info.metric!(Job, :backlog))
+
+      assert assert_metric_emitted(@backlog, value: 2) ==
+               {%{value: 2}, %{provider: "ses", status: :pending}}
+    end
+
+    test "is matched when it is zeroed after its group vanished" do
+      Runner.emit(Job, Info.metric!(Job, :backlog), [%{provider: "ses", status: :pending}])
+
+      assert_metric_emitted(@backlog, value: 0, tags: %{provider: "ses"})
     end
   end
 

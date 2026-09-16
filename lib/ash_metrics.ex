@@ -276,13 +276,18 @@ defmodule AshMetrics do
   rejected, so a list of every resource in an application can be passed without
   filtering it first.
 
-  A counter becomes a `Telemetry.Metrics.Counter` named `<metric>.count` and a
+  A counter becomes a `Telemetry.Metrics.Counter` named `<metric>.count`, a
   distribution a `Telemetry.Metrics.Distribution` named `<metric>.duration`,
-  where the part before the suffix is what the configured
-  `AshMetrics.NameBuilder` returns. Each definition's tags are the declared tags
-  plus the keys the configured `AshMetrics.TagExtractor` supplies, plus the
-  outcome tag for a counter, which is exactly the set of keys an emission can
-  carry.
+  and a gauge a `Telemetry.Metrics.LastValue` named `<metric>.gauge`, where the
+  part before the suffix is what the configured `AshMetrics.NameBuilder`
+  returns. A counter's and a distribution's tags are the declared tags plus the
+  keys the configured `AshMetrics.TagExtractor` supplies, plus the outcome tag
+  for a counter, which is exactly the set of keys an emission can carry.
+
+  A gauge's tags are its `group_by` attributes, plus `tenant` when the resource
+  is multitenant under either of Ash's strategies. The tag extractor's keys are
+  not added: a gauge is polled rather than emitted from a call site, so there
+  is no metadata for an extractor to read.
 
   Finally, the configured backend gets a chance to rewrite the list through
   `c:AshMetrics.Backend.transform_metrics/2`, if it implements that optional
@@ -301,10 +306,7 @@ defmodule AshMetrics do
     resources
     |> Enum.filter(&declares_metrics?/1)
     |> Enum.flat_map(fn resource ->
-      resource
-      |> Info.metrics()
-      |> Enum.reject(&match?(%Gauge{}, &1))
-      |> Enum.map(&definition(resource, &1, extractor_keys))
+      Enum.map(Info.metrics(resource), &definition(resource, &1, extractor_keys))
     end)
     |> transform()
   end
@@ -335,6 +337,24 @@ defmodule AshMetrics do
         description: distribution.description
       ] ++ reporter_options(distribution)
     )
+  end
+
+  defp definition(resource, %Gauge{} = gauge, _extractor_keys) do
+    Telemetry.Metrics.last_value(
+      NameBuilder.build(resource, gauge.name) <> ".gauge",
+      event_name: event_name(resource, gauge.name),
+      measurement: :value,
+      tags: gauge.group_by ++ tenant_tag(resource),
+      description: gauge.description
+    )
+  end
+
+  @spec tenant_tag(module()) :: [atom()]
+  defp tenant_tag(resource) do
+    case Ash.Resource.Info.multitenancy_strategy(resource) do
+      nil -> []
+      _strategy -> [:tenant]
+    end
   end
 
   @spec reporter_options(Distribution.t()) :: keyword()

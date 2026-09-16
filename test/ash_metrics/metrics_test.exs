@@ -23,9 +23,13 @@ defmodule AshMetrics.MetricsTest do
   alias AshMetrics.MetricsTest.Silent
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
+  alias AshMetrics.Test.Job
   alias AshMetrics.Test.Plain
+  alias AshMetrics.Test.SchemaJob
+  alias AshMetrics.Test.TenantJob
   alias Telemetry.Metrics.Counter
   alias Telemetry.Metrics.Distribution
+  alias Telemetry.Metrics.LastValue
 
   setup do
     original = Application.get_env(:ash_metrics, :backend)
@@ -96,6 +100,41 @@ defmodule AshMetrics.MetricsTest do
                AshMetrics.metrics_for([Invoice])
     end
 
+    test "compiles a gauge into a Telemetry.Metrics.LastValue" do
+      assert [%LastValue{} = backlog, %LastValue{} = total] = AshMetrics.metrics_for([Job])
+
+      assert backlog.name == [:test, :queue, :job, :backlog, :gauge]
+      assert backlog.event_name == [:ash_metrics, Job, :backlog]
+      assert backlog.measurement == :value
+      assert backlog.tags == [:status, :provider]
+      assert backlog.description == "Jobs waiting to be picked up"
+      assert backlog.unit == :unit
+      assert backlog.reporter_options == []
+
+      assert total.name == [:test, :queue, :job, :total, :gauge]
+      assert total.tags == []
+      assert total.description == nil
+    end
+
+    test "tags a gauge on an :attribute multitenant resource with the tenant" do
+      assert [%LastValue{} = backlog] = AshMetrics.metrics_for([TenantJob])
+
+      assert backlog.name == [:test, :queue, :tenant_job, :backlog, :gauge]
+      assert backlog.tags == [:status, :tenant]
+    end
+
+    test "tags a gauge on a :context multitenant resource with the tenant" do
+      assert [%LastValue{} = backlog] = AshMetrics.metrics_for([SchemaJob])
+
+      assert backlog.name == [:test, :queue, :schema_job, :backlog, :gauge]
+      assert backlog.tags == [:status, :tenant]
+    end
+
+    test "adds no tag extractor keys to a gauge" do
+      assert [%LastValue{tags: [:status, :provider]}, %LastValue{tags: []}] =
+               AshMetrics.metrics_for([Job])
+    end
+
     test "skips a resource that does not use the extension" do
       assert AshMetrics.metrics_for([Plain]) == []
       assert length(AshMetrics.metrics_for([Plain, Invoice])) == 2
@@ -135,7 +174,11 @@ defmodule AshMetrics.MetricsTest do
                [:test, :mailings, :templated_delivery, :delivery, :count],
                [:test, :mailings, :templated_delivery, :send_latency, :duration],
                [:test, :mailings, :invoice, :capture, :count],
-               [:test, :mailings, :invoice, :settlement_lag, :duration]
+               [:test, :mailings, :invoice, :settlement_lag, :duration],
+               [:test, :queue, :job, :backlog, :gauge],
+               [:test, :queue, :job, :total, :gauge],
+               [:test, :queue, :tenant_job, :backlog, :gauge],
+               [:test, :queue, :schema_job, :backlog, :gauge]
              ]
     end
 
