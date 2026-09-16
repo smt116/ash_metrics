@@ -3,7 +3,7 @@ defmodule AshMetrics.Dsl.Counter do
   A counter declared in a resource's `metrics` block.
 
   A counter answers "how many events, and how fast?". It is emitted manually
-  with AshMetrics.increment/3 at the moment a business outcome becomes known,
+  with `AshMetrics.increment/3` at the moment a business outcome becomes known,
   and it compiles to a single `Telemetry.Metrics.Counter` carrying an `outcome`
   tag whose permitted values are exactly the declared `outcomes`.
   """
