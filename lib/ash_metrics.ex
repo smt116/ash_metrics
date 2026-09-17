@@ -290,6 +290,9 @@ defmodule AshMetrics do
 
   `opts` are passed to both. An application that declares no gauges and runs
   the default backend still gets the poller's process, which sits idle.
+
+  `AshMetrics.Supervisor` is the alternative for an application that would
+  rather add one child than splice a list: it supervises exactly this.
   """
   @spec child_specs(keyword()) :: [Supervisor.child_spec()]
   def child_specs(opts \\ []), do: Backend.child_specs(opts) ++ Poller.child_specs(opts)

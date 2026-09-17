@@ -282,10 +282,10 @@ defmodule MyApp.Telemetry do
 
   @impl true
   def init(_arg) do
-    children =
-      [
-        {Telemetry.Metrics.ConsoleReporter, metrics: my_own_metrics() ++ AshMetrics.metrics()}
-      ] ++ AshMetrics.child_specs()
+    children = [
+      {Telemetry.Metrics.ConsoleReporter, metrics: my_own_metrics() ++ AshMetrics.metrics()},
+      AshMetrics.Supervisor
+    ]
 
     Supervisor.init(children, strategy: :one_for_one)
   end
@@ -298,12 +298,15 @@ The same list works for a Prometheus reporter:
 {TelemetryMetricsPrometheus, metrics: AshMetrics.metrics()}
 ```
 
-`AshMetrics.child_specs/0` starts whatever the configured backend needs,
-followed by every poller in use — the gauges are grouped by the poller that
-polls them, and each is asked once for its own. With the default
-`AshMetrics.Backend.Noop` the backend adds nothing, which is the right answer
-when you already run a reporter of your own. Pass an explicit resource list to
-`AshMetrics.metrics_for/1` if domain discovery is not what you want.
+`AshMetrics.Supervisor` starts whatever the configured backend needs, followed
+by every poller in use — the gauges are grouped by the poller that polls them,
+and each is asked once for its own. Put it after your repository, since a
+gauge is answered by a query. `AshMetrics.child_specs/1` returns the same
+children as a list, for a tree that would rather splice them in than add a
+supervisor. With the default `AshMetrics.Backend.Noop` the backend adds
+nothing, which is the right answer when you already run a reporter of your
+own. Pass an explicit resource list to `AshMetrics.metrics_for/1` if domain
+discovery is not what you want.
 
 With the default poller every node polls, so in a cluster each gauge is
 computed and emitted once per node per period. A `last_value` of the same
