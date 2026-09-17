@@ -13,10 +13,17 @@ gitignored, so it may be absent; do not recreate it.
 All of these must pass before any piece of work is considered done:
 
 - `mix test`
+- `mix test.integration`
 - `mix format` (or `mix format --check-formatted`)
 - `mix credo --strict`
 - `mix dialyzer`
 - `mix docs`
+
+`mix test` alone must never require Docker: the tests that need a database are
+tagged `:postgres` and excluded by default. `mix test.integration` includes
+them and needs the container from this repository's `docker-compose.yml`
+(`docker compose up -d`, `docker compose stop`). Drive only that compose file,
+only from the repository root; never touch another container on the machine.
 
 ## Design principles
 

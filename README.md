@@ -1,8 +1,9 @@
 # AshMetrics
 
 **Status:** pre-release, not on Hex. Counters, distributions, gauges with their
-polling, the emission API, the behaviours and the test helpers work. The
-`ash_oban` poller and the OpenTelemetry backend do not exist yet.
+polling from either a timer or Oban, the emission API, the behaviours and the
+test helpers work. The OpenTelemetry backend does not exist yet; with the
+default `Backend.Noop` the host application's own reporter ships the metrics.
 
 ## What it is
 
@@ -48,6 +49,11 @@ config :ash_metrics,
   backend: AshMetrics.Backend.Noop,
   poller: AshMetrics.Poller.GenServer,
   tenant_source: MyApp.Tenants                      # :context multitenancy only
+
+# Only when the Oban poller is chosen; see "Polling with Oban".
+config :ash_metrics, AshMetrics.Poller.AshOban,
+  queue: :default,
+  max_attempts: 1
 ```
 
 `prefix` must be set in compile-time configuration — `config/config.exs`, not
@@ -159,6 +165,81 @@ A group that disappears is emitted once as a zero. Without that, a
 `last_value` metric would report the backlog's last non-zero value forever
 after it drained, which is exactly when someone is looking at it.
 
+### Polling with Oban
+
+The default `AshMetrics.Poller.GenServer` runs a timer on every node, which
+means every node polls, a failed poll is a log line, and how long polling
+takes is nobody's business. An application that already runs Oban has better
+answers to all three, and `AshMetrics.Poller.AshOban` uses them: Oban's cron
+plugin inserts one job per period for the whole cluster, a failed poll is a
+failed job with its error in Oban Web, and each gauge has its own worker and
+queue entry, so its duration and failure rate are things Oban already
+measures.
+
+```elixir
+config :ash_metrics, poller: AshMetrics.Poller.AshOban
+
+config :ash_metrics, AshMetrics.Poller.AshOban,
+  queue: :default,
+  max_attempts: 1
+```
+
+`max_attempts` defaults to one on purpose. A gauge answers a question about
+the present, so retrying a poll that failed three minutes ago answers a
+different question than the one that failed; the next scheduled poll is the
+better retry.
+
+One resource at a time works too, which is the usual shape: one expensive
+backlog on the queue, the cheap gauges on the timer.
+
+```elixir
+metrics do
+  poller AshMetrics.Poller.AshOban
+
+  gauge :backlog, filter: expr(status == :pending), period: :timer.minutes(5)
+end
+```
+
+Three things have to be true for such a resource.
+
+- **It uses the `AshOban` extension**, which owns the `oban` section the
+  schedules are added to: `extensions: [AshOban, AshMetrics]`.
+- **Every gauge's `period` is a whole number of minutes from 1 to 59, of
+  hours from 1 to 23, or exactly one day.** Cron cannot express anything
+  else, and rounding silently would make the declaration disagree with the
+  schedule.
+- **The queue exists in your Oban configuration, and the crontab is the one
+  `AshOban.config/2` built**, or the schedules are never registered:
+
+  ```elixir
+  config :my_app, Oban,
+    AshOban.config(
+      Application.fetch_env!(:my_app, :ash_domains),
+      repo: MyApp.Repo,
+      queues: [default: 10],
+      plugins: [Oban.Plugins.Cron]
+    )
+  ```
+
+The first two are compile errors naming the gauge, rather than warnings: a
+transformer that cannot build the schedule has no valid resource to hand on.
+
+What it generates is invisible but not secret. Each gauge gets a private
+generic action `__ash_metrics_emit_<gauge>__` and a matching entry in the
+resource's `oban.scheduled_actions`. The actions are not public, so
+`ash_json_api` and `ash_graphql` do not expose them, and the underscores say
+that nothing should call them by hand — `AshMetrics.Gauge.Runner.emit/3` is
+how you poll a gauge from code.
+
+One thing is weaker than with the timer. Zeroing a group that has drained
+means remembering the groups the previous poll found, and an Oban job has no
+state between runs, so `AshMetrics.Poller.AshOban.Memory` keeps that in
+`:persistent_term` — per node, not persisted, best effort. Since the cron is a
+cluster-wide singleton, a vanished group is zeroed by each node that had seen
+it the next time that node runs the job, and a freshly started node zeroes
+nothing at all. A gauge whose groups come and go constantly is better served
+by the timer, where every node polls and every node remembers.
+
 ### Multitenancy
 
 Multitenant resources are polled differently depending on what Ash will let a
@@ -213,16 +294,18 @@ The same list works for a Prometheus reporter:
 ```
 
 `AshMetrics.child_specs/0` starts whatever the configured backend needs,
-followed by the poller that keeps the gauges up to date. With the default
+followed by every poller in use — the gauges are grouped by the poller that
+polls them, and each is asked once for its own. With the default
 `AshMetrics.Backend.Noop` the backend adds nothing, which is the right answer
 when you already run a reporter of your own. Pass an explicit resource list to
 `AshMetrics.metrics_for/1` if domain discovery is not what you want.
 
-Every node polls, so in a cluster each gauge is computed and emitted once per
-node per period. A `last_value` of the same number reported by five nodes is
-still that number, but the queries behind it are not free; a poller backed by
-a job queue is the answer when that matters, and `AshMetrics.Poller` is the
-behaviour to implement.
+With the default poller every node polls, so in a cluster each gauge is
+computed and emitted once per node per period. A `last_value` of the same
+number reported by five nodes is still that number, but the queries behind it
+are not free. That is what
+[polling with Oban](#polling-with-oban) is for, and
+`AshMetrics.Poller` is the behaviour to implement for anything else.
 
 ## Testing
 
@@ -249,6 +332,39 @@ imports the assertions. Name the metric as the declaration produces it, without
 the `.count`, `.gauge` or `.duration` suffix a reporter adds. `:telemetry` handlers are
 global, so keep such modules `async: false` — see `AshMetrics.Test` for the
 details.
+
+## Development
+
+`mix test` runs the whole suite except the Postgres integration tests, and
+needs no database and no container. The tests that do need one are tagged
+`:postgres`, excluded by default, and run against the container this
+repository's `docker-compose.yml` defines:
+
+```sh
+docker compose up -d
+mix test.integration
+docker compose stop
+```
+
+`mix test.integration` creates the database, migrates it and runs everything
+with `--include postgres`. The container is named `ash_metrics-postgres-1` and
+publishes Postgres on `${ASH_METRICS_PG_PORT:-54329}`, well away from the
+default so it cannot collide with another instance on the same machine; set
+that variable if 54329 is taken. Only ever drive it through `docker compose`
+from the repository root, so that no container outside this project is
+touched.
+
+The rest of the checks:
+
+```sh
+mix format --check-formatted
+mix credo --strict
+mix dialyzer
+mix docs
+```
+
+`mix docs` regenerates the DSL cheat sheet in `documentation/dsls`, which is
+checked in; commit it with whatever DSL change produced it.
 
 ## Non-goals
 

@@ -35,6 +35,18 @@ and this project adheres to
 - `AshMetrics.Poller` behaviour, with `AshMetrics.Poller.GenServer`, which
   polls every gauge from one process on a timer per gauge and survives a
   failing or raising strategy.
+- A `poller` option on the `metrics` section, overriding the configured poller
+  for one resource's gauges. `AshMetrics.Poller.child_specs/1` groups the
+  application's gauges by poller and asks each for its own.
+- `AshMetrics.Poller.AshOban`, which polls a resource's gauges from Oban's
+  cron instead of a timer: one poll per period for the whole cluster, a failed
+  poll as a failed job, and a private generic action plus a scheduled action
+  generated per gauge.
+- `AshMetrics.Poller.AshOban.Cron`, mapping a gauge's `period` to a cron
+  expression and rejecting the periods cron cannot express exactly.
+- `AshMetrics.Poller.AshOban.Memory`, the node-local `:persistent_term` record
+  of the groups a poll found, so that the Oban poller can still zero a group
+  that has drained.
 - `AshMetrics.child_specs/1`, the backend's children followed by the poller's.
 - `AshMetrics.Backend` behaviour, with `AshMetrics.Backend.Noop` and
   `AshMetrics.Backend.Test`.
