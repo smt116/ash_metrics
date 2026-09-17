@@ -1,12 +1,9 @@
-# The Postgres instance the `:postgres` tagged integration tests run against.
+# The Postgres instance the `:postgres` tagged integration tests run against;
+# see `mix test.integration` and the README.
 #
-# The project name is pinned so that this file never adopts, restarts or
-# removes a container started by anything else on the machine, and the port is
-# well away from the default so that it cannot collide with one either.
-#
-#     docker compose up -d
-#     mix test.integration
-#     docker compose stop
+# Keep the project name pinned, so that this file never adopts, restarts or
+# removes a container started by anything else on the machine, and keep the
+# port well away from the default, so that it cannot collide with one either.
 name: ash_metrics
 
 services:

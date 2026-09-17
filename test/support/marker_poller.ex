@@ -1,8 +1,8 @@
 defmodule AshMetrics.Test.MarkerPoller do
   @moduledoc false
   # A poller that starts an Agent holding the gauges it was given, so that
-  # `AshMetrics.Poller.child_specs/1` can be asserted to have handed each
-  # poller its own gauges and nobody else's.
+  # `AshMetrics.Poller.child_specs/1` can be asserted to hand each poller its
+  # own gauges only.
 
   @behaviour AshMetrics.Poller
 

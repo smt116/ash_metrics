@@ -3,12 +3,12 @@ defmodule AshMetrics.Test.Compiler do
   # Compiles throwaway resources at test time so that the compile-time failures
   # of the verifiers can be asserted on.
   #
-  # Spark runs verifiers from an `@after_verify` hook and deliberately converts
-  # anything they raise into a compiler warning, so `assert_raise` cannot see
-  # the error. `Spark.Test` exists for exactly this: it registers the calling
-  # process as a collector and delivers the `Spark.Error.DslError` values as
-  # data. Verification is therefore re-run in the test process, after the
-  # module itself has been compiled with its output suppressed.
+  # Spark runs verifiers from an `@after_verify` hook and converts anything
+  # they raise into a compiler warning, so `assert_raise` cannot see the error.
+  # `Spark.Test` registers the calling process as a collector and delivers the
+  # `Spark.Error.DslError` values as data, so verification is re-run in the
+  # test process after the module has been compiled with its output
+  # suppressed.
   #
   # Each resource gets a unique module name and is purged when the test that
   # built it finishes.

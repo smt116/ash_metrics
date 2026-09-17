@@ -1,10 +1,9 @@
 defmodule AshMetrics.Test.ObanJob do
   @moduledoc false
-  # A resource whose gauges are polled by Oban rather than by a timer. It is
-  # backed by ETS, because everything the transformer generates — the action,
-  # the schedule, the worker module — exists without a database; only actually
-  # draining an Oban queue needs one, and that is what the `:postgres` tagged
-  # integration tests are for.
+  # A resource whose gauges are polled by Oban rather than by a timer. ETS is
+  # enough: everything the transformer generates — the action, the schedule,
+  # the worker module — exists without a database. Draining a real Oban queue
+  # is `AshMetrics.Test.PgObanJob`.
   use Ash.Resource,
     domain: AshMetrics.Test.Queue,
     data_layer: Ash.DataLayer.Ets,

@@ -7,23 +7,8 @@ defmodule AshMetrics.Supervisor do
   — with a `:one_for_one` strategy. Adding it to an application is equivalent
   to splicing that list in.
 
-  Put it after the repository: a gauge is answered by a query.
-
-      defmodule MyApp.Application do
-        use Application
-
-        @impl Application
-        def start(_type, _args) do
-          children = [
-            MyApp.Repo,
-            MyAppWeb.Endpoint,
-            {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()},
-            AshMetrics.Supervisor
-          ]
-
-          Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
-        end
-      end
+  Put it after the repository: a gauge is answered by a query. See the README
+  for a worked supervision tree.
 
   `:name` names this supervisor, as it does for any other child of a
   supervision tree; every other option is passed on to

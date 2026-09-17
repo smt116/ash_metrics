@@ -130,7 +130,7 @@ defmodule AshMetrics.Config do
   @doc """
   How many times a poll scheduled by `AshMetrics.Poller.AshOban` is attempted.
 
-  Defaults to one, so a failed poll is not retried before its next schedule.
+  Defaults to one; see `AshMetrics.Poller.AshOban`.
 
       config :ash_metrics, AshMetrics.Poller.AshOban, max_attempts: 2
   """

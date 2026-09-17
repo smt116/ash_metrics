@@ -271,29 +271,14 @@ defmodule AshMetrics do
 
   The configured `AshMetrics.Backend`'s children come first, followed by
   whatever the configured `AshMetrics.Poller` needs to poll the declared
-  gauges.
-
-      defmodule MyApp.Application do
-        use Application
-
-        @impl Application
-        def start(_type, _args) do
-          children =
-            [
-              MyApp.Repo,
-              MyAppWeb.Endpoint,
-              {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()}
-            ] ++ AshMetrics.child_specs()
-
-          Supervisor.start_link(children, strategy: :one_for_one, name: MyApp.Supervisor)
-        end
-      end
+  gauges. Splice the result into a supervision tree after the repository; see
+  the README for a worked example.
 
   `opts` are passed to both. An application that declares no gauges and runs
   the default backend still gets the poller's process, which sits idle.
 
-  `AshMetrics.Supervisor` is the alternative for an application that would
-  rather add one child than splice a list: it supervises exactly this.
+  `AshMetrics.Supervisor` supervises exactly this, for an application that
+  would rather add one child than splice a list.
   """
   @spec child_specs(keyword()) :: [Supervisor.child_spec()]
   def child_specs(opts \\ []), do: Backend.child_specs(opts) ++ Poller.child_specs(opts)
@@ -342,12 +327,6 @@ defmodule AshMetrics do
 
   The configured backend may rewrite the result through
   `c:AshMetrics.Backend.transform_metrics/2`.
-
-  Splice the result into a reporter:
-
-      children = [
-        {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()}
-      ]
   """
   @spec metrics_for([module()]) :: [Telemetry.Metrics.t()]
   def metrics_for(resources) do

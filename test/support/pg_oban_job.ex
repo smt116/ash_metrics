@@ -2,9 +2,8 @@ defmodule AshMetrics.Test.PgObanJob do
   @moduledoc false
   # The one resource that has everything the Oban poller needs at once: a
   # Postgres data layer for Oban to store its jobs beside, the `AshOban`
-  # extension, and a gauge that selects the Oban poller. It exists so that the
-  # generated schedule can be driven through a real Oban queue rather than
-  # only inspected.
+  # extension, and a gauge that selects the Oban poller, so that the generated
+  # schedule can be driven through a real Oban queue.
   use Ash.Resource,
     domain: AshMetrics.Test.Pg,
     data_layer: AshPostgres.DataLayer,

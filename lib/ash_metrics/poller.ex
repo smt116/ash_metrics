@@ -17,12 +17,8 @@ defmodule AshMetrics.Poller do
         poller AshMetrics.Poller.AshOban
       end
 
-  Splice `child_specs/1` into a supervision tree to start it:
-
-      children = [MyApp.Repo, MyAppWeb.Endpoint] ++ AshMetrics.Poller.child_specs()
-
-  or use `AshMetrics.child_specs/1`, which adds the configured backend's
-  children as well.
+  `AshMetrics.child_specs/1` starts these children along with the backend's; a
+  host application normally calls that rather than `child_specs/1` here.
   """
 
   alias AshMetrics.Config

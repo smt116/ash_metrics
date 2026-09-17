@@ -15,8 +15,7 @@ config :ash, default_string_length_count: :codepoints
 config :logger, level: :warning
 
 # The database behind the `:postgres` tagged integration tests, published by
-# `docker-compose.yml`. Nothing connects to it unless those tests are included,
-# so `mix test` runs with no database at all.
+# `docker-compose.yml`.
 config :ash_metrics, ecto_repos: [AshMetrics.Test.Repo]
 
 config :ash_metrics, AshMetrics.Test.Repo,

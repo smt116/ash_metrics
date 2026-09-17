@@ -1,8 +1,8 @@
 defmodule AshMetrics.Test.SchemaCounter do
   @moduledoc false
   # `:context` multitenancy without a gauge: nothing is polled, so nothing has
-  # to enumerate the tenants. Deliberately outside a domain, so that resource
-  # discovery does not find it.
+  # to enumerate the tenants. Outside a domain, so resource discovery does not
+  # find it.
   use Ash.Resource,
     domain: nil,
     validate_domain_inclusion?: false,

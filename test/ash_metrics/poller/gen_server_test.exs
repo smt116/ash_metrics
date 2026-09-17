@@ -1,8 +1,8 @@
 defmodule AshMetrics.Poller.GenServerTest.Notify do
   @moduledoc false
-  # Tells the listening test process that a strategy ran. A strategy that
-  # neither emits nor returns groups is otherwise invisible, and counting
-  # polls by waiting for a number of milliseconds is a coin toss.
+  # Tells the listening test process that a strategy ran, so that a test can
+  # count polls by receiving messages rather than by waiting a number of
+  # milliseconds.
 
   @name :ash_metrics_poller_gen_server_test
 

@@ -10,12 +10,8 @@ defmodule AshMetrics.Backend do
   is the normal case for an application that already runs a reporter and only
   wants to splice `AshMetrics.metrics/0` into it.
 
-  Splice `child_specs/1` into a supervision tree to start whatever the
-  configured backend needs:
-
-      children = [MyApp.Repo, MyAppWeb.Endpoint] ++ AshMetrics.Backend.child_specs()
-
-      Supervisor.init(children, strategy: :one_for_one)
+  `AshMetrics.child_specs/1` starts these children along with the poller's; a
+  host application normally calls that rather than `child_specs/1` here.
   """
 
   alias AshMetrics.Config

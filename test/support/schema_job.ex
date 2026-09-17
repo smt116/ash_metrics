@@ -1,9 +1,8 @@
 defmodule AshMetrics.Test.SchemaJob do
   @moduledoc false
   # Context multitenancy: the ETS data layer gives each tenant its own table,
-  # named after the resource and the tenant, which is as close to a schema per
-  # tenant as ETS gets. The tables are deliberately left public, so that the
-  # poller process can read what a test process seeded.
+  # named after the resource and the tenant. The tables must stay public, so
+  # that the poller process can read what a test process seeded.
   use Ash.Resource,
     domain: AshMetrics.Test.Queue,
     data_layer: Ash.DataLayer.Ets,

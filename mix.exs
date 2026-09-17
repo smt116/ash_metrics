@@ -39,8 +39,8 @@ defmodule AshMetrics.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      # Hex requires the `links` key. Left empty until the repository
-      # URL is decided; no placeholder URL is published.
+      # Hex requires the `links` key. Left empty until the repository URL is
+      # decided.
       links: %{},
       files: ~w(lib documentation .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
@@ -127,10 +127,9 @@ defmodule AshMetrics.MixProject do
       # Needed only by `AshMetrics.Poller.AshOban`, which is not the default
       # poller. An application that polls from a timer never loads it.
       {:ash_oban, "~> 0.8", optional: true},
-      # Only the Postgres integration suite needs a SQL data layer. It is
-      # tagged `:postgres` and excluded from `mix test`; see `mix
-      # test.integration`. `:dev` is in the list only because `.formatter.exs`
-      # imports it, and `mix format` runs in `:dev`.
+      # Only the Postgres integration suite needs a SQL data layer. `:dev` is
+      # in the list because `.formatter.exs` imports it and `mix format` runs
+      # in `:dev`.
       {:ash_postgres, "~> 2.13", only: [:dev, :test]},
       # Required by the Spark.Formatter plugin in .formatter.exs and by
       # Igniter. Optional, and not restricted to an environment, because
