@@ -66,6 +66,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Dsl.Distribution,
           AshMetrics.Dsl.Gauge,
           AshMetrics.Info,
+          AshMetrics.Supervisor,
           AshMetrics.Verifiers.VerifyMetrics,
           AshMetrics.Verifiers.VerifyPrefix,
           AshMetrics.Verifiers.VerifyTenantSource
@@ -93,6 +94,9 @@ defmodule AshMetrics.MixProject do
         Testing: [
           AshMetrics.Backend.Test,
           AshMetrics.Test
+        ],
+        "Mix tasks": [
+          Mix.Tasks.AshMetrics.Install
         ]
       ],
       formatters: ["html"]

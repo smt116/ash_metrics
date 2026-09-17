@@ -34,10 +34,33 @@ StatsD, Prometheus, AppSignal. Counter emission is a synchronous
 
 ## Installation
 
-The package is not published yet, so there is no dependency to add. Hex
-publication is pending.
+Once the package is on Hex, one command does the whole installation:
 
-Configuration, once it is:
+```sh
+mix igniter.install ash_metrics
+```
+
+It adds the dependency and then does the three things that are otherwise easy
+to forget. It writes `prefix` and `otp_app` to `config/config.exs`, derived
+from your application's name and never overwriting a value you have already
+chosen. It appends `++ AshMetrics.metrics()` to the `metrics/0` of the module
+that imports `Telemetry.Metrics` and defines it — `MyAppWeb.Telemetry` in a
+generated Phoenix application — so the reporter you already start ships the
+declared metrics too. And it adds `AshMetrics.Supervisor` to your
+application's children, after the repositories, since a gauge is answered by a
+query. When there is no such telemetry module it prints the reporter snippet
+to add by hand rather than guessing which reporter you want, and it prints the
+optional configuration keys with their defaults either way. Running it again
+changes nothing.
+
+The package is not on Hex yet, so that command does not work for anyone else
+so far. Until it does, and for a project that would rather not run an
+installer, the same installation by hand is three steps: add the dependency,
+write the configuration block below, and wire the metrics into your reporter
+and supervision tree as [Wiring into your
+reporter](#wiring-into-your-reporter) describes.
+
+Configuration:
 
 ```elixir
 config :ash_metrics,

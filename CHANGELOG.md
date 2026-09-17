@@ -47,7 +47,14 @@ and this project adheres to
 - `AshMetrics.Poller.AshOban.Memory`, the node-local `:persistent_term` record
   of the groups a poll found, so that the Oban poller can still zero a group
   that has drained.
-- `AshMetrics.child_specs/1`, the backend's children followed by the poller's.
+- `AshMetrics.child_specs/1`, the backend's children followed by the poller's,
+  and `AshMetrics.Supervisor`, which supervises the same children so that a
+  host application adds one child rather than splicing a list.
+- `mix ash_metrics.install`, an Igniter task run as
+  `mix igniter.install ash_metrics`. It writes `prefix` and `otp_app`,
+  appends `AshMetrics.metrics/0` to the `metrics/0` of the module that
+  imports `Telemetry.Metrics`, and adds `AshMetrics.Supervisor` to the host
+  application's children.
 - `AshMetrics.Backend` behaviour, with `AshMetrics.Backend.Noop` and
   `AshMetrics.Backend.Test`.
 - `use AshMetrics.Test`, with `assert_metric_emitted/2` and
