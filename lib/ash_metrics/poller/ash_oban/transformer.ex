@@ -138,10 +138,8 @@ defmodule AshMetrics.Poller.AshOban.Transformer do
 
              gauge #{inspect(gauge.name)}, period: :timer.minutes(5)
 
-         Rounding to the nearest expressible period is deliberately not done: \
-         a declaration and a schedule that quietly disagree are worse than a \
-         compile error. Choose another `AshMetrics.Poller` if this gauge \
-         really does need a period cron cannot express.
+         The period is not rounded. Choose another `AshMetrics.Poller` if this \
+         gauge needs a period cron cannot express.
          """)}
     end
   end

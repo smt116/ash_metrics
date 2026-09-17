@@ -32,9 +32,8 @@ defmodule AshMetrics.Verifiers.VerifyPrefix do
 
                config :ash_metrics, prefix: "myapp"
 
-           Every metric name declared here is prefixed with it, and a metric
-           name is a permanent contract, so it is not derived from the
-           application name.
+           Every metric name declared here starts with it. It is never derived
+           from the application name.
            """
          )}
     end

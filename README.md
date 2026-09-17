@@ -192,8 +192,8 @@ Like `prefix`, the poller has to be compile-time configuration: the schedules
 are generated while the resource compiles, and a poller that differs between
 compile time and runtime leaves the gauges with no poller at all.
 
-One resource at a time works too, which is the usual shape: one expensive
-backlog on the queue, the cheap gauges on the timer.
+The poller can also be chosen per resource, for example one expensive backlog
+on the queue and the remaining gauges on the timer:
 
 ```elixir
 metrics do
