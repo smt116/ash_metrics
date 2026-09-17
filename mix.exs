@@ -128,14 +128,18 @@ defmodule AshMetrics.MixProject do
       # test.integration`. `:dev` is in the list only because `.formatter.exs`
       # imports it, and `mix format` runs in `:dev`.
       {:ash_postgres, "~> 2.13", only: [:dev, :test]},
-      # Required by the Spark.Formatter plugin in .formatter.exs.
-      {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false},
+      # Required by the Spark.Formatter plugin in .formatter.exs and by
+      # Igniter. Optional, and not restricted to an environment, because
+      # Igniter depends on it unconditionally.
+      {:sourceror, "~> 1.7", optional: true},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
-      # Required by the `spark.cheat_sheets` task used to build the DSL
-      # reference. Not an installer; `mix igniter.install` is not supported.
-      {:igniter, "~> 0.6", only: [:dev, :test], runtime: false}
+      # Needed by `mix ash_metrics.install`, which a consumer runs through
+      # `mix igniter.install ash_metrics`, and by the `spark.cheat_sheets`
+      # task used to build the DSL reference. Optional, so that an
+      # application which never runs the installer does not pull it in.
+      {:igniter, "~> 0.6", optional: true}
     ]
   end
 end
