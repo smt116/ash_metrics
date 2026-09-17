@@ -13,14 +13,12 @@ defmodule AshMetrics.Gauge.Strategy.Count do
   tenant for a resource `AshMetrics.Gauge.Runner` polls per tenant. A gauge
   with no `group_by` is a single count.
 
-  That is the price of an exact number. A resource where it is too expensive
-  can declare its own `AshMetrics.Gauge.Strategy` — an estimate from the
-  database's own statistics, a cached value, or a single hand-written query
-  that collapses the per-group loop.
+  A resource where that is too expensive can declare its own
+  `AshMetrics.Gauge.Strategy` — an estimate from the database's own statistics,
+  a cached value, or a single hand-written query that collapses the per-group
+  loop.
 
-  Every query runs with `authorize?: false`: a poll has no actor, and a gauge
-  that silently counted only what some actor may see would be a lie about the
-  state of the table.
+  Every query runs with `authorize?: false`, since a poll has no actor.
   """
 
   @behaviour AshMetrics.Gauge.Strategy

@@ -9,13 +9,10 @@ defmodule AshMetrics.Poller.AshOban.Emit do
 
   An error is returned rather than swallowed, so that `Ash.run_action!/1`
   inside AshOban's worker raises and the poll shows up as a failed Oban job.
-  That is the whole reason to poll from a queue instead of a timer, which can
-  only log.
 
-  The groups each poll found are handed to
-  `AshMetrics.Poller.AshOban.Memory`, so that the next poll can zero the ones
-  that have drained. A failed poll leaves that memory untouched: it says
-  nothing about which groups still exist, and forgetting would lose a zero.
+  The groups each poll found are handed to `AshMetrics.Poller.AshOban.Memory`,
+  so that the next poll can zero the ones that have drained. A failed poll
+  leaves that memory untouched.
   """
 
   use Ash.Resource.Actions.Implementation

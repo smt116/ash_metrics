@@ -2,19 +2,16 @@ defmodule AshMetrics.Poller.AshOban do
   @moduledoc """
   Polls a resource's gauges from Oban, on a cron schedule.
 
-  Where `AshMetrics.Poller.GenServer` runs a timer on every node, this poller
-  runs nothing of its own: `child_specs/2` is empty, and the work is an Oban
-  job like any other. That buys three things a timer cannot.
+  This poller runs nothing of its own: `child_specs/2` is empty, and the work
+  is an Oban job like any other. Compared with the timer of
+  `AshMetrics.Poller.GenServer`:
 
-  * **One poll per period, not one per node.** Oban's cron plugin inserts a
-    single job per schedule for the whole cluster, so a gauge is computed once
-    however many nodes are running.
-  * **A failed poll is a failed job.** It appears in Oban Web with its error,
-    and is retried if `max_attempts` says so, rather than disappearing into a
-    log line.
-  * **The poll is visible.** Each gauge has its own worker module and its own
-    queue entry, so how long polling takes and how often it fails are
-    questions Oban already answers.
+  * Oban's cron plugin inserts a single job per schedule for the whole
+    cluster, so a gauge is computed once however many nodes are running.
+  * A failed poll is a failed job, visible in Oban Web with its error, and
+    retried if `max_attempts` allows.
+  * Each gauge has its own worker module and queue entry, so its duration and
+    failure rate are things Oban already measures.
 
   ## Choosing it
 
@@ -26,22 +23,16 @@ defmodule AshMetrics.Poller.AshOban do
         poller AshMetrics.Poller.AshOban
       end
 
-  The choice is read while the resource compiles, because that is when the
-  schedules are generated, so the configuration form belongs in
-  `config/config.exs` rather than `config/runtime.exs`. A poller that differs
-  between compile time and runtime leaves the gauges with no poller at all:
-  no schedules were generated, and the timer poller is not the one running.
+  The schedules are generated while the resource compiles, so the
+  configuration form must be in `config/config.exs`; see `AshMetrics.Config`.
 
   ## What the resource has to do
 
-  The generated machinery is invisible, but it is not free of requirements.
-
-  1. **The resource must use the `AshOban` extension**, because that is what
-     owns the `oban` section the schedules are added to. A resource that
-     selects this poller without it is a compile error naming the gauge.
+  1. **The resource must use the `AshOban` extension**, which owns the `oban`
+     section the schedules are added to. A resource that selects this poller
+     without it is a compile error naming the gauge.
   2. **Every gauge's `period` must be a whole number of minutes, hours, or
-     one day.** Cron cannot express anything else, and rounding silently
-     would make the declaration a lie. See
+     one day**, which is all cron can express. See
      `AshMetrics.Poller.AshOban.Cron`.
   3. **The queue must exist in the host application's Oban configuration**,
      and the crontab must be the one `AshOban.config/2` built, or the
@@ -61,10 +52,8 @@ defmodule AshMetrics.Poller.AshOban do
         queue: :default,
         max_attempts: 1
 
-  `max_attempts` defaults to one on purpose. A gauge answers a question about
-  the present, so retrying a poll that failed three minutes ago answers a
-  different question than the one that failed; the next scheduled poll is the
-  better retry.
+  `max_attempts` defaults to one, so a failed poll waits for its next
+  schedule.
 
   ## What it generates
 
@@ -72,17 +61,16 @@ defmodule AshMetrics.Poller.AshOban do
   private generic action `:__ash_metrics_emit_<gauge>__`, run by
   `AshMetrics.Poller.AshOban.Emit`, and a matching entry in the resource's
   `oban.scheduled_actions` with the cron expression for the gauge's period.
-  The names are prefixed and suffixed with underscores to signal that nothing
-  should call them by hand, and the actions are not public, so extensions such
-  as `ash_json_api` and `ash_graphql` do not expose them.
+  Nothing should call the generated action by hand; use
+  `AshMetrics.Gauge.Runner.emit/3`. The actions are not public, so extensions
+  such as `ash_json_api` and `ash_graphql` do not expose them.
 
   ## What it does not do
 
-  A `last_value` gauge has to be told when a group has drained, which means
-  remembering the groups the previous poll found. A timer keeps that in the
-  poller's own process state; an Oban job has no state at all between runs, so
-  `AshMetrics.Poller.AshOban.Memory` keeps it in `:persistent_term` — per
-  node, best effort. See that module for what that costs.
+  Zeroing a group that has drained means remembering the groups the previous
+  poll found, and an Oban job has no state between runs.
+  `AshMetrics.Poller.AshOban.Memory` holds that per node and best effort; see
+  that module for the limits.
   """
 
   @behaviour AshMetrics.Poller
@@ -91,10 +79,6 @@ defmodule AshMetrics.Poller.AshOban do
 
   @doc """
   No children: the polling is done by Oban's cron plugin.
-
-  The gauges are still handed over, as they are to every poller, and still
-  ignored. `AshMetrics.child_specs/1` therefore remains the one call a host
-  application makes whichever poller it chose.
   """
   @impl AshMetrics.Poller
   @spec child_specs([Poller.gauge()], keyword()) :: [Supervisor.child_spec()]

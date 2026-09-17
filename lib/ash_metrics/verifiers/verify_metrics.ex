@@ -2,12 +2,6 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   @moduledoc """
   Checks the metric declarations of a resource while it compiles.
 
-  Everything here could in principle be discovered at runtime, on the first
-  emission, in production. That is precisely why it is checked at compile time
-  instead: a metric that is wrong is usually a metric nobody is looking at, so
-  the mistake surfaces as a gap in a dashboard weeks later rather than as an
-  error.
-
   The checks are:
 
   * metric names are unique — counters, gauges and distributions share one
@@ -15,15 +9,13 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * a counter declares at least one outcome, and no outcome twice
   * tag keys are not repeated
   * tag keys do not collide with the outcome tag or with the keys the
-    configured `AshMetrics.TagExtractor` adds, since those are applied to every
-    emission and would otherwise be overwritten
+    configured `AshMetrics.TagExtractor` adds
   * bucket boundaries are a non-empty, strictly ascending list of positive
     numbers
   * a gauge groups by attributes of the resource, and by none of them twice
 
-  A gauge's `group_by` is deliberately not checked against the reserved tags. A
-  reserved tag is one applied to every emission from a call site, and a gauge
-  has no call site: its tags are exactly the values of its `group_by`.
+  A gauge's `group_by` is not checked against the reserved tags: a gauge has no
+  call site, and its tags are exactly the values of its `group_by`.
   """
 
   use Spark.Dsl.Verifier

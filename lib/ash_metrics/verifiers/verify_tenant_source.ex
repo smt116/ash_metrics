@@ -3,21 +3,12 @@ defmodule AshMetrics.Verifiers.VerifyTenantSource do
   Rejects a multitenant resource that declares a gauge which has to be polled
   per tenant while `tenant_source` is unset.
 
-  Two shapes have to be polled per tenant: a resource using the `:context`
-  strategy, whose tenants each have their own schema, and a resource using the
-  `:attribute` strategy without `global? true`, which Ash refuses to read
-  without a tenant.
-  Nothing but the application can say which tenants exist, so without a source
-  such a gauge would be polled for no tenant at all and emit nothing — a metric
-  that looks configured and reports nothing, which is the failure this package
-  exists to prevent.
+  Without a source such a gauge is polled for no tenant at all and emits
+  nothing. `AshMetrics.TenantSource` lists the two shapes that have to be
+  polled per tenant; nothing is checked for an `:attribute` multitenant
+  resource with `global? true`, whose gauges are covered by one query.
 
-  Nothing is checked for an `:attribute` multitenant resource with `global?
-  true`: one query grouped by the tenant attribute covers every tenant.
-
-  Like every Spark verifier, a failure is reported by the compiler as a warning
-  pointing at the resource, not as a hard error. Compile with
-  `--warnings-as-errors` to turn it into one.
+  See `AshMetrics` for how a verifier failure is reported.
   """
 
   use Spark.Dsl.Verifier

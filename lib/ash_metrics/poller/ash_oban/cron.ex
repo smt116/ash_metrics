@@ -2,10 +2,9 @@ defmodule AshMetrics.Poller.AshOban.Cron do
   @moduledoc """
   Turns a gauge's `period` into the cron expression Oban schedules it with.
 
-  A period is milliseconds and a cron expression is whole minutes, so the two
-  do not describe the same set of schedules. Rather than round, which would
-  make a declaration and what actually happens quietly disagree, only periods
-  that are exactly expressible are accepted:
+  A period is milliseconds and a cron expression is whole minutes. Only
+  periods that cron can express exactly are accepted, and no period is
+  rounded:
 
   * a whole number of minutes from one to fifty-nine, as `*/N * * * *`
   * a whole number of hours from one to twenty-three, as `0 */H * * *`
@@ -15,11 +14,11 @@ defmodule AshMetrics.Poller.AshOban.Cron do
   `:error`, and `AshMetrics.Poller.AshOban.Transformer` turns that into a
   `Spark.Error.DslError` naming the gauge.
 
-  Note what the step syntax means: `*/20 * * * *` fires at minute 0, 20 and 40
-  of every hour, so the last interval of an hour that does not divide evenly is
-  shorter than the period asks for. `0 */7 * * *` behaves the same way across a
-  day. That is cron's arithmetic, not this module's, and it is why a period
-  that divides its unit evenly is the one to prefer.
+  The step syntax fires at fixed points of the hour or day: `*/20 * * * *`
+  fires at minute 0, 20 and 40 of every hour, so the last interval of an hour
+  that does not divide evenly is shorter than the period asks for.
+  `0 */7 * * *` behaves the same way across a day. Prefer a period that divides
+  its unit evenly.
 
       iex> AshMetrics.Poller.AshOban.Cron.from_period(:timer.minutes(5))
       {:ok, "*/5 * * * *"}

@@ -11,27 +11,20 @@ defmodule AshMetrics.Poller.AshOban.Transformer do
     cron expression for the gauge's `period` and the queue and `max_attempts`
     from `config :ash_metrics, AshMetrics.Poller.AshOban`.
 
-  Resources that use another poller are left alone, which is what lets one
-  application poll one backlog from its queue and the rest from a timer.
+  Resources that use another poller are left alone.
 
-  ## Why this is a transformer, and why it reports its own errors
+  ## Failures
 
   Two things can be wrong with such a gauge: the resource may not use the
-  `AshOban` extension, and the `period` may be one cron cannot express. Both
-  are checked here rather than in a verifier, because a verifier runs *after*
-  every transformer and there would be nothing left to check by then. Without
-  the `AshOban` extension there is no `[:oban, :scheduled_actions]` to add an
-  entity to, and without a cron expression there is no entity to add: in both
-  cases this transformer cannot produce a valid resource, so it stops.
+  `AshOban` extension, leaving no `[:oban, :scheduled_actions]` to add an entry
+  to, and the `period` may be one cron cannot express, leaving no entry to add.
+  Either is a compile error rather than the warning a verifier would report.
+  Both are checked here rather than in a verifier, which would run after every
+  transformer.
 
-  That makes these two compile *errors*, unlike the warnings `AshMetrics`'s
-  verifiers report. The difference is deliberate — a verifier objects to a
-  resource that would compile, and this objects to one that would not.
-
-  It runs before AshOban's own SetDefaults transformer, which is the one that
-  resolves a scheduled action's queue and checks that the action it names
-  exists; everything AshOban generates from the `oban` section runs after
-  that, so being ahead of it is enough to be ahead of all of it.
+  It runs before AshOban's own SetDefaults transformer, which resolves a
+  scheduled action's queue and checks that the action it names exists;
+  everything AshOban generates from the `oban` section runs after that.
   """
 
   use Spark.Dsl.Transformer
@@ -68,9 +61,8 @@ defmodule AshMetrics.Poller.AshOban.Transformer do
     end
   end
 
-  # The `metrics` section's own option, falling back to the configured poller,
-  # which is what `AshMetrics.Info.poller/1` answers for the compiled module.
-  # It is read from the DSL state here because the module does not exist yet.
+  # `AshMetrics.Info.poller/1` answers this for a compiled module, which does
+  # not exist yet here, so the option is read from the DSL state instead.
   @spec poller(Spark.Dsl.t()) :: module()
   defp poller(dsl_state) do
     case Transformer.get_option(dsl_state, [:metrics], :poller) do
@@ -184,9 +176,8 @@ defmodule AshMetrics.Poller.AshOban.Transformer do
   end
 
   # AshOban warns about a scheduled action with no `worker_module_name`,
-  # because renaming one would otherwise orphan the jobs already enqueued
-  # under the old module. The name it would have derived is set explicitly
-  # instead, so the warning is right and we are not the exception to it.
+  # because renaming one orphans the jobs already enqueued under the old
+  # module. The name AshOban would have derived is set explicitly instead.
   @spec worker_module_name(Spark.Dsl.t(), atom()) :: module()
   defp worker_module_name(dsl_state, name) do
     Module.concat([

@@ -12,19 +12,14 @@ defmodule AshMetrics.Gauge.Strategy do
         group_by: [:status],
         strategy: MyApp.Stats.Backlog
 
-  It is a module rather than a function capture so that the thing a resource
-  points at is inspectable and testable on its own, as with
-  `AshMetrics.NameBuilder` and `AshMetrics.TagExtractor`.
-
   ## The contract
 
   `c:compute/3` returns one entry per group, `{tags, value}`, where `tags` maps
   each of the gauge's `group_by` attribute names to that group's value. A gauge
   that groups by nothing returns exactly one entry, `{%{}, value}`. A gauge
-  that groups by something returns no entry at all for a group with no rows,
-  which is the honest answer: nothing in the table says the group exists.
-  `AshMetrics.Gauge.Runner` is what turns a group that has vanished since the
-  last poll into a zero.
+  that groups by something returns no entry at all for a group with no rows.
+  `AshMetrics.Gauge.Runner` turns a group that has vanished since the last poll
+  into a zero.
 
   Every entry is emitted as one measurement with the tags it carries, so the
   cardinality of the result is the cardinality of the metric. Returning one
@@ -53,8 +48,8 @@ defmodule AshMetrics.Gauge.Strategy do
     that is polled once per tenant: one using Ash's `:context` multitenancy
     strategy, or its `:attribute` strategy without `global? true`.
 
-  Returns `{:error, reason}` rather than raising, so that one failing gauge
-  neither takes the poller down nor stops the others from being emitted.
+  Return `{:error, reason}` rather than raising: one failing gauge must neither
+  take the poller down nor stop the others from being emitted.
   """
   @callback compute(resource :: module(), gauge :: Gauge.t(), opts :: keyword()) ::
               {:ok, [group()]} | {:error, term()}

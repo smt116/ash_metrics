@@ -2,9 +2,8 @@ defmodule AshMetrics.Config do
   @moduledoc """
   Reads the `:ash_metrics` application environment.
 
-  Everything has a default except `prefix` and `otp_app`, which have no sane
-  default and raise when absent. See `prefix!/0` for why `prefix` is required
-  rather than derived.
+  Everything has a default except `prefix` and `otp_app`, which raise when
+  absent.
 
       config :ash_metrics,
         prefix: "myapp",
@@ -21,13 +20,11 @@ defmodule AshMetrics.Config do
 
       config :ash_metrics, tenant_source: MyApp.Tenants
 
-  The values are read on each call rather than captured in a module attribute,
-  so that a host application can override most of them from
-  `config/runtime.exs`. Two are read while resources compile and therefore
-  belong in `config/config.exs`: `prefix`, which a verifier requires, and
-  `poller`, which decides whether `AshMetrics.Poller.AshOban.Transformer`
-  generates Oban schedules for a resource. A `poller` that differs between
-  compile time and runtime leaves gauges with no poller at all.
+  The values are read on each call, so most of them can be overridden from
+  `config/runtime.exs`. Two are read while resources compile and must be set in
+  `config/config.exs`: `prefix`, which a verifier requires, and `poller`, which
+  decides whether Oban schedules are generated for a resource. A `poller` that
+  differs between compile time and runtime leaves gauges with no poller at all.
   """
 
   @app :ash_metrics
@@ -35,11 +32,8 @@ defmodule AshMetrics.Config do
   @doc """
   The metric name prefix. Required.
 
-  Raises when it is missing or not a non-empty string. It is required rather
-  than derived from `otp_app` because a compile-time lookup of the owning
-  application is unreliable — `Application.get_application/1` returns `nil`
-  while the owning application is itself being compiled — and a metric name is
-  a permanent contract that cannot be quietly wrong.
+  Raises when it is missing or not a non-empty string. It must be set in
+  `config/config.exs` and is never derived from `otp_app`.
   """
   @spec prefix!() :: String.t()
   def prefix! do
@@ -136,9 +130,7 @@ defmodule AshMetrics.Config do
   @doc """
   How many times a poll scheduled by `AshMetrics.Poller.AshOban` is attempted.
 
-  Defaults to one. A gauge is a question about the present, so a retry three
-  minutes later answers a different question than the one that failed; the
-  next scheduled poll is the better retry.
+  Defaults to one, so a failed poll is not retried before its next schedule.
 
       config :ash_metrics, AshMetrics.Poller.AshOban, max_attempts: 2
   """

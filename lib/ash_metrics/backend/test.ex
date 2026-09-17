@@ -8,9 +8,9 @@ defmodule AshMetrics.Backend.Test do
 
       {:ash_metrics, name, measurements, metadata}
 
-  `name` is the metric name without its aggregation suffix — the name a
+  `name` is the metric name without its aggregation suffix: the name a
   declaration produces, not the `.count` or `.duration` variant a reporter
-  publishes — because that is the name a test author wrote and can recognise.
+  publishes.
 
   Handlers are keyed by the receiving process, so each test attaches and
   detaches its own. `:telemetry` handlers are still global: an attachment is
@@ -32,8 +32,7 @@ defmodule AshMetrics.Backend.Test do
   Forwards every emission behind `metrics` to `pid`, which defaults to the
   calling process.
 
-  Attaching twice for the same process is not useful and `:telemetry` will
-  refuse it, so call `detach/1` between.
+  Attaching twice for the same process fails; call `detach/1` between.
   """
   @spec attach([Telemetry.Metrics.t()], pid()) :: :ok
   def attach(metrics, pid \\ self()) do

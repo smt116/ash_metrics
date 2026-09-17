@@ -9,7 +9,7 @@ defmodule AshMetrics.Dsl.Gauge do
 
   `group_by` is a list of attributes of the resource, and its values become the
   tags of the emission, so a gauge with `group_by: [:status]` publishes one
-  timeseries per status rather than one metric name per status.
+  metric name with one timeseries per status.
   """
 
   defstruct [
@@ -35,9 +35,7 @@ defmodule AshMetrics.Dsl.Gauge do
   @doc """
   The `AshMetrics.Gauge.Strategy` module that computes a gauge's value.
 
-  Resolves the built-in `:count` to `AshMetrics.Gauge.Strategy.Count`, and is
-  the only place that mapping is made, so that a declaration and a poll always
-  agree on which strategy a gauge means.
+  Resolves the built-in `:count` to `AshMetrics.Gauge.Strategy.Count`.
   """
   @spec strategy_module(t()) :: module()
   def strategy_module(%__MODULE__{strategy: :count}), do: AshMetrics.Gauge.Strategy.Count

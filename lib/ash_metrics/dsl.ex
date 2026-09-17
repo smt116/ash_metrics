@@ -13,13 +13,12 @@ defmodule AshMetrics.Dsl do
     Declares a counter: how many times a business event happened, broken down by
     outcome.
 
-    `outcomes` is the closed set of permitted values for the `outcome` tag. It is
-    a tag rather than a name segment, so a counter with five outcomes is one
-    metric name with five tag values, not five metric names. Emitting an outcome
-    that is not declared raises.
+    `outcomes` is the closed set of permitted values for the `outcome` tag: a
+    counter with five outcomes is one metric name carrying five tag values, not
+    five metric names. Emitting an outcome that is not declared raises.
 
     `tags` is an allowlist. Only the keys listed here may be passed as call-site
-    tags, which is what keeps unbounded values out of the metric.
+    tags.
     """,
     examples: [
       "counter :delivery, outcomes: [:sent, :bounced, :error]",
@@ -64,9 +63,9 @@ defmodule AshMetrics.Dsl do
     latency or payload size.
 
     Values are observed one at a time; the histogram itself is built by the
-    reporter. `buckets` are therefore reporter specific boundaries, passed
-    through untouched, and `unit` may be a conversion tuple so that call sites
-    can observe native time units without converting first.
+    reporter. `buckets` are reporter specific boundaries, passed through
+    untouched, and `unit` may be a conversion tuple, so a call site can observe
+    a native time unit without converting first.
 
     As with counters, `tags` is an allowlist of the keys a call site may pass.
     """,
@@ -120,21 +119,16 @@ defmodule AshMetrics.Dsl do
     Declares a gauge: how many rows match a filter right now, broken down by
     the values of `group_by`.
 
-    A gauge is the one primitive nothing emits by hand. The package polls it
-    every `period`, computes one value per group, and emits each one, so a
-    gauge is a question about the current state of a table rather than a record
-    of something that happened.
+    Nothing emits a gauge by hand. The package polls it every `period`,
+    computes one value per group, and emits each one.
 
     `group_by` names attributes of the resource, and their values become the
-    tags of the emission. One gauge with `group_by: [:status]` is therefore one
-    metric name with one timeseries per status.
+    tags of the emission. One gauge with `group_by: [:status]` is one metric
+    name with one timeseries per status.
 
-    The default `:count` strategy runs one query to learn which groups exist
-    and then one count per group, because Ash has no `GROUP BY`. That is
-    `1 + groups` queries per period, and that again for every tenant of a
-    resource that has to be polled per tenant. A resource whose backlog is
-    expensive to count exactly can supply its own `AshMetrics.Gauge.Strategy`
-    instead.
+    A poll costs queries. See `AshMetrics.Gauge.Strategy.Count` for what the
+    default strategy costs, and `AshMetrics.Gauge.Strategy` for supplying one
+    of your own.
     """,
     examples: [
       "gauge :backlog, filter: expr(status == :pending)",
@@ -177,7 +171,7 @@ defmodule AshMetrics.Dsl do
         type: :pos_integer,
         default: 60_000,
         doc:
-          "How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution, since most collectors flush on a ten second interval anyway and every poll costs queries."
+          "How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution: most collectors flush on a ten second interval, and every poll costs queries."
       ],
       description: [
         type: :string,

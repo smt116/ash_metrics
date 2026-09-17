@@ -13,8 +13,7 @@ defmodule AshMetrics.NameBuilder.Default do
   read well in a metric name can override it with `name` in its `metrics`
   block.
 
-  Consumers whose house style differs supply their own builder; see
-  `AshMetrics.NameBuilder`.
+  See `AshMetrics.NameBuilder` to supply a different convention.
   """
 
   @behaviour AshMetrics.NameBuilder

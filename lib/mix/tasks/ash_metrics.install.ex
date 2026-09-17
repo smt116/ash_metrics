@@ -8,17 +8,12 @@ if Code.ensure_loaded?(Igniter) do
     Writes the two pieces of configuration that AshMetrics cannot default:
 
     * `prefix`, the first segment of every metric name, set to the name of
-      the application being installed into. It is required rather than
-      derived, because a compile-time lookup of the owning application is
-      unreliable and a metric name is a permanent contract; see
-      `AshMetrics.Config.prefix!/0`.
+      the application being installed into. See `AshMetrics.Config.prefix!/0`.
     * `otp_app`, the application whose Ash domains are searched for resources
       that declare metrics.
 
-    Neither is overwritten if it is already configured, so the task is safe to
-    run again. Everything else AshMetrics reads has a default, and the task
-    prints those rather than writing them out, so that a configuration file
-    only ever holds what the application actually decided.
+    Everything else AshMetrics reads has a default; the task prints those
+    rather than writing them out.
 
     It then wires the metrics up:
 
@@ -30,7 +25,8 @@ if Code.ensure_loaded?(Igniter) do
     * `AshMetrics.Supervisor` is added to the application's children, after
       the repositories and Oban, because a gauge is answered by a query.
 
-    Both are idempotent, so the task is safe to run again.
+    Nothing already configured is overwritten, so the task is safe to run
+    again.
 
         mix igniter.install ash_metrics
     """
@@ -50,13 +46,10 @@ if Code.ensure_loaded?(Igniter) do
 
     @example "mix igniter.install ash_metrics"
 
-    # Printed rather than written into `config/config.exs` as comments.
-    # Igniter can emit a comment above a configuration block, through
-    # `Igniter.Project.Config.configure_group/6`, but only when the
-    # application is not configured at all, and Sourceror gives such a
-    # comment line 0, which lands it above `import Config` in a
-    # `config/config.exs` that holds nothing else. A notice is always shown
-    # and never in the wrong place.
+    # Printed rather than written into `config/config.exs` as comments:
+    # Sourceror gives a comment emitted by
+    # `Igniter.Project.Config.configure_group/6` line 0, which lands it above
+    # `import Config`.
     @optional_keys """
     Everything else AshMetrics reads has a default. These are they:
 
@@ -111,8 +104,8 @@ if Code.ensure_loaded?(Igniter) do
       |> Igniter.add_notice(@optional_keys)
     end
 
-    # `configure_new/5` rather than `configure/6`, so that a `prefix` an
-    # adopter has already chosen is never replaced by the application name.
+    # `configure_new/5`, not `configure/6`: a `prefix` an adopter has already
+    # chosen must not be replaced by the application name.
     @spec configure(Igniter.t(), atom()) :: Igniter.t()
     defp configure(igniter, app_name) do
       igniter
@@ -129,9 +122,8 @@ if Code.ensure_loaded?(Igniter) do
     end
 
     # A module that both imports `Telemetry.Metrics` and defines `metrics/0`
-    # is where a reporter is told what to report. Phoenix generates exactly
-    # one, `MyAppWeb.Telemetry`; every match is updated, since an umbrella or
-    # a hand-written tree may have more.
+    # is where a reporter is told what to report. Every match is updated: an
+    # umbrella or a hand-written tree may have more than Phoenix's one.
     @spec telemetry_module?(module(), Zipper.t()) :: boolean()
     defp telemetry_module?(_module, zipper) do
       imports_telemetry_metrics?(zipper) and match?({:ok, _zipper}, metrics_body(zipper))
@@ -173,10 +165,9 @@ if Code.ensure_loaded?(Igniter) do
       match?({:ok, _zipper}, Function.move_to_function_call(zipper, {AshMetrics, :metrics}, 0))
     end
 
-    # The value of `metrics/0` is whatever its last expression evaluates to,
-    # which is the list a reporter is handed. Appending to that expression
-    # rather than rewriting the function leaves an application's own metrics,
-    # and whatever it computes them from, untouched.
+    # The value of `metrics/0` is whatever its last expression evaluates to.
+    # Appending to that expression leaves an application's own metrics, and
+    # whatever it computes them from, untouched.
     @spec append_call(Zipper.t()) :: Zipper.t()
     defp append_call(zipper) do
       zipper = last_expression(zipper)

@@ -5,9 +5,8 @@ defmodule AshMetrics do
   `AshMetrics` is an `Ash.Resource` extension that adds a `metrics do` block in
   which counters, gauges and distributions are declared next to the action they
   describe and validated at compile time. Those declarations compile to
-  `Telemetry.Metrics` definitions rather than to a new emit/aggregate/export
-  pipeline, so the host application's existing reporter is what actually ships
-  them to a backend.
+  `Telemetry.Metrics` definitions; the host application's existing reporter
+  ships them to a backend.
 
       defmodule MyApp.Mailings.TemplatedDelivery do
         use Ash.Resource,
@@ -42,13 +41,16 @@ defmodule AshMetrics do
       )
 
   A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
-  `period` and emits one value per group, which is why a gauge is declared with
-  the query that answers it rather than with the tags a caller may pass.
+  `period` and emits one value per group.
 
-  What the host application consumes is `metrics/0`, the declarations of every
-  resource compiled to `Telemetry.Metrics` definitions, ready to be spliced
-  into whatever reporter it already runs, and `child_specs/1`, which starts the
+  A host application consumes `metrics/0`, the declarations of every resource
+  compiled to `Telemetry.Metrics` definitions, ready to be spliced into
+  whatever reporter it already runs, and `child_specs/1`, which starts the
   configured backend and the poller.
+
+  A declaration that fails one of this extension's verifiers is reported by the
+  compiler as a warning pointing at the declaration, not as a hard error;
+  compile with `--warnings-as-errors` to turn it into one.
 
   See `AshMetrics.Dsl` for the section definition and `AshMetrics.Info` for
   introspection.
@@ -95,8 +97,8 @@ defmodule AshMetrics do
   @doc """
   Emits one count of the counter `metric` on `resource`.
 
-  Everything is checked before the event is executed, and anything wrong raises
-  `ArgumentError` rather than emitting a metric nobody asked for:
+  Everything is checked before the event is executed; anything wrong raises
+  `ArgumentError`:
 
   * `metric` must be a declared `counter` on `resource`
   * `outcome` must be one of that counter's declared outcomes
@@ -267,10 +269,9 @@ defmodule AshMetrics do
   @doc """
   Everything AshMetrics needs running, for a supervision tree.
 
-  That is whatever the configured `AshMetrics.Backend` starts, followed by
+  The configured `AshMetrics.Backend`'s children come first, followed by
   whatever the configured `AshMetrics.Poller` needs to poll the declared
-  gauges. The backend comes first, so that a backend which starts a reporter
-  is ready before the first gauge is polled.
+  gauges.
 
       defmodule MyApp.Application do
         use Application
@@ -311,10 +312,6 @@ defmodule AshMetrics do
   @doc """
   Every resource of the configured application's Ash domains that declares
   metrics.
-
-  Shared by `metrics/0` and `AshMetrics.Poller.child_specs/1`, so that what a
-  reporter is told about and what is polled can never be two different sets of
-  resources.
   """
   @spec resources() :: [module()]
   def resources do
@@ -327,12 +324,9 @@ defmodule AshMetrics do
   @doc """
   The `Telemetry.Metrics` definitions of the given resources.
 
-  Named `metrics_for/1` rather than `metrics/1` because the `metrics` section
-  builder this module generates for the DSL already occupies `metrics/1`.
-
-  Resources that do not use the `AshMetrics` extension are skipped rather than
-  rejected, so a list of every resource in an application can be passed without
-  filtering it first.
+  Resources that do not use the `AshMetrics` extension are skipped, so a list
+  of every resource in an application can be passed without filtering it
+  first.
 
   A counter becomes a `Telemetry.Metrics.Counter` named `<metric>.count`, a
   distribution a `Telemetry.Metrics.Distribution` named `<metric>.duration`,
@@ -344,12 +338,10 @@ defmodule AshMetrics do
 
   A gauge's tags are its `group_by` attributes, plus `tenant` when the resource
   is multitenant under either of Ash's strategies. The tag extractor's keys are
-  not added: a gauge is polled rather than emitted from a call site, so there
-  is no metadata for an extractor to read.
+  not added: a gauge has no call-site metadata to read them from.
 
-  Finally, the configured backend gets a chance to rewrite the list through
-  `c:AshMetrics.Backend.transform_metrics/2`, if it implements that optional
-  callback.
+  The configured backend may rewrite the result through
+  `c:AshMetrics.Backend.transform_metrics/2`.
 
   Splice the result into a reporter:
 

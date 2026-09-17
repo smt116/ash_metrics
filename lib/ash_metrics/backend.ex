@@ -2,18 +2,11 @@ defmodule AshMetrics.Backend do
   @moduledoc """
   Optionally starts a reporter, and optionally rewrites the metric definitions.
 
-  A backend is thin on purpose. This package's output is the list of
-  `Telemetry.Metrics` definitions from `AshMetrics.metrics/0`, and the
-  established reporter ecosystem already ships those to StatsD, Prometheus,
-  OTLP or anything else. A backend exists only so that an application which
-  runs no reporter yet is not forced to wire one before it can see a metric,
-  and so that one which does run a reporter can adapt the definitions to it.
-
   Configure one with:
 
       config :ash_metrics, backend: AshMetrics.Backend.Noop
 
-  A backend that returns `:ignore` from `c:child_spec/1` starts nothing. That
+  A backend that returns `:ignore` from `c:child_spec/1` starts nothing, which
   is the normal case for an application that already runs a reporter and only
   wants to splice `AshMetrics.metrics/0` into it.
 

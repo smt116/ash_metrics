@@ -2,18 +2,16 @@ defmodule AshMetrics.Gauge.Runner do
   @moduledoc """
   Polls one gauge once and emits one measurement per group.
 
-  This is the whole of what a poll is: ask the gauge's
-  `AshMetrics.Gauge.Strategy` for the current value of every group, execute one
-  `:telemetry` event per group, and report which groups were found. What
-  decides *when* to poll is an `AshMetrics.Poller`; this module is what it
-  calls, and is also what to call by hand from a test, an IEx session, or an
-  application that would rather schedule gauges itself.
+  A poll asks the gauge's `AshMetrics.Gauge.Strategy` for the current value of
+  every group, executes one `:telemetry` event per group, and reports which
+  groups were found. An `AshMetrics.Poller` decides *when* to poll and calls
+  this module; call it by hand from a test, an IEx session, or an application
+  that schedules gauges itself.
 
   ## Multitenancy
 
-  What Ash allows is handled differently case by case, because the cases are
-  different questions. Every emission carries the tenant as the `tenant` tag
-  either way, so nothing downstream has to know which case a resource is.
+  How a resource is polled depends on what Ash will let a query do. Every
+  emission carries the tenant as the `tenant` tag, whichever case applies.
 
   * A resource with no multitenancy is polled once.
   * A resource using the `:attribute` strategy with `global? true` is polled
@@ -24,18 +22,15 @@ defmodule AshMetrics.Gauge.Runner do
   * A resource using the `:attribute` strategy without `global? true` is polled
     once per tenant of the configured `AshMetrics.TenantSource`, each poll
     naming its tenant, because Ash refuses a read of such a resource that names
-    no tenant. Turning `global?` on to save the extra queries would widen
-    tenantless reads for the whole application, which is not a trade a metric
-    should ask anyone to make.
+    no tenant.
   * A resource using the `:context` strategy is polled once per tenant as well,
     since each tenant's rows live in their own schema.
 
   ## Groups that vanish
 
-  A `last_value` metric keeps reporting the last thing it was told. A gauge
+  A `last_value` metric keeps reporting the last thing it was told, so a gauge
   grouped by status that drains from `%{status: :pending} => 12` to nothing at
-  all would therefore sit at 12 forever, which is the opposite of what a gauge
-  is for.
+  all would sit at 12 forever.
 
   `emit/3` is given the groups the previous poll found and emits a zero for
   every one of them that is missing from this poll, once. It returns the groups
