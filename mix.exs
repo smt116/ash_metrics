@@ -82,6 +82,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend.Noop,
           AshMetrics.Gauge.Strategy.Count,
           AshMetrics.NameBuilder.Default,
+          AshMetrics.Poller.AshOban.Cron,
           AshMetrics.Poller.GenServer,
           AshMetrics.TagExtractor.Default
         ],
@@ -115,6 +116,9 @@ defmodule AshMetrics.MixProject do
       {:spark, "~> 2.2"},
       {:telemetry, "~> 1.0"},
       {:telemetry_metrics, "~> 1.0"},
+      # Needed only by `AshMetrics.Poller.AshOban`, which is not the default
+      # poller. An application that polls from a timer never loads it.
+      {:ash_oban, "~> 0.8", optional: true},
       # Only the Postgres integration suite needs a SQL data layer. It is
       # tagged `:postgres` and excluded from `mix test`; see `mix
       # test.integration`. `:dev` is in the list only because `.formatter.exs`
