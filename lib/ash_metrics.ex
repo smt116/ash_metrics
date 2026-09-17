@@ -56,6 +56,9 @@ defmodule AshMetrics do
 
   use Spark.Dsl.Extension,
     sections: [AshMetrics.Dsl.metrics()],
+    transformers: [
+      AshMetrics.Poller.AshOban.Transformer
+    ],
     verifiers: [
       AshMetrics.Verifiers.VerifyPrefix,
       AshMetrics.Verifiers.VerifyMetrics,

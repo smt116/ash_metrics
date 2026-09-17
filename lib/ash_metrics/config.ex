@@ -118,6 +118,37 @@ defmodule AshMetrics.Config do
   def poller, do: Application.get_env(@app, :poller, AshMetrics.Poller.GenServer)
 
   @doc """
+  The Oban queue the gauges polled by `AshMetrics.Poller.AshOban` run in.
+
+  Defaults to `:default`. The queue has to exist in the host application's
+  Oban configuration; `AshOban.config/2` refuses to build a crontab entry for
+  a queue that does not.
+
+      config :ash_metrics, AshMetrics.Poller.AshOban, queue: :metrics
+  """
+  @spec ash_oban_queue() :: atom()
+  def ash_oban_queue, do: ash_oban(:queue, :default)
+
+  @doc """
+  How many times a poll scheduled by `AshMetrics.Poller.AshOban` is attempted.
+
+  Defaults to one. A gauge is a question about the present, so a retry three
+  minutes later answers a different question than the one that failed; the
+  next scheduled poll is the better retry.
+
+      config :ash_metrics, AshMetrics.Poller.AshOban, max_attempts: 2
+  """
+  @spec ash_oban_max_attempts() :: pos_integer()
+  def ash_oban_max_attempts, do: ash_oban(:max_attempts, 1)
+
+  @spec ash_oban(atom(), term()) :: term()
+  defp ash_oban(key, default) do
+    @app
+    |> Application.get_env(AshMetrics.Poller.AshOban, [])
+    |> Keyword.get(key, default)
+  end
+
+  @doc """
   The configured `AshMetrics.TenantSource`, or `nil` when there is none.
 
   There is no default: only an application whose resources use Ash's

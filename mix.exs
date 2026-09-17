@@ -82,7 +82,10 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend.Noop,
           AshMetrics.Gauge.Strategy.Count,
           AshMetrics.NameBuilder.Default,
+          AshMetrics.Poller.AshOban,
           AshMetrics.Poller.AshOban.Cron,
+          AshMetrics.Poller.AshOban.Emit,
+          AshMetrics.Poller.AshOban.Transformer,
           AshMetrics.Poller.GenServer,
           AshMetrics.TagExtractor.Default
         ],

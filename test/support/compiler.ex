@@ -36,31 +36,61 @@ defmodule AshMetrics.Test.Compiler do
   @spec compile_resource(Macro.t(), [Macro.t()]) :: module()
   def compile_resource(metrics_block, attributes \\ []) do
     module = unique_module()
-    ExUnit.Callbacks.on_exit(fn -> purge(module) end)
 
-    ast =
-      quote do
-        defmodule unquote(module) do
-          @moduledoc false
-          use Ash.Resource,
-            domain: nil,
-            validate_domain_inclusion?: false,
-            data_layer: Ash.DataLayer.Simple,
-            extensions: [AshMetrics]
-
-          unquote(metrics_block)
-
-          attributes do
-            uuid_primary_key :id
-
-            unquote_splicing(attributes)
-          end
-        end
-      end
-
-    ExUnit.CaptureIO.capture_io(:stderr, fn -> Code.compile_quoted(ast, "nofile") end)
+    ExUnit.CaptureIO.capture_io(:stderr, fn ->
+      Code.compile_quoted(resource(module, metrics_block, attributes, [AshMetrics]), "nofile")
+    end)
 
     module
+  end
+
+  # A transformer's error is a hard compile error rather than a warning, so
+  # `dsl_errors/2` cannot collect it: nothing is left to verify once a
+  # transformer has stopped. This compiles the resource and returns whatever it
+  # raised instead.
+  @spec transformer_error(Macro.t(), [module()], [Macro.t()]) :: Exception.t()
+  def transformer_error(metrics_block, extensions \\ [AshMetrics], attributes \\ []) do
+    module = unique_module()
+    ast = resource(module, metrics_block, attributes, extensions)
+
+    {result, _stderr} =
+      ExUnit.CaptureIO.with_io(:stderr, fn ->
+        try do
+          Code.compile_quoted(ast, "nofile")
+          :compiled
+        rescue
+          error -> error
+        end
+      end)
+
+    case result do
+      :compiled -> raise "expected #{inspect(module)} not to compile, but it did"
+      error -> error
+    end
+  end
+
+  @spec resource(module(), Macro.t(), [Macro.t()], [module()]) :: Macro.t()
+  defp resource(module, metrics_block, attributes, extensions) do
+    ExUnit.Callbacks.on_exit(fn -> purge(module) end)
+
+    quote do
+      defmodule unquote(module) do
+        @moduledoc false
+        use Ash.Resource,
+          domain: nil,
+          validate_domain_inclusion?: false,
+          data_layer: Ash.DataLayer.Simple,
+          extensions: unquote(extensions)
+
+        unquote(metrics_block)
+
+        attributes do
+          uuid_primary_key :id
+
+          unquote_splicing(attributes)
+        end
+      end
+    end
   end
 
   @spec unique_module() :: module()
