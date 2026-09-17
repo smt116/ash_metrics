@@ -22,7 +22,9 @@ spark_locals_without_parens = [
 ]
 
 [
-  import_deps: [:ash, :spark],
+  # `:ash_postgres` is a test-only dependency, imported so that the resources
+  # in `test/support` backed by it format like the rest.
+  import_deps: [:ash, :ash_postgres, :spark],
   plugins: [Spark.Formatter],
   inputs: ["{mix,.formatter,.credo}.exs", "{config,lib,test}/**/*.{ex,exs}"],
   locals_without_parens: spark_locals_without_parens,

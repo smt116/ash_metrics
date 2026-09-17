@@ -14,6 +14,7 @@ defmodule AshMetrics.MixProject do
       start_permanent: Mix.env() == :prod,
       deps: deps(),
       aliases: aliases(),
+      preferred_cli_env: ["test.integration": :test],
       package: package(),
       docs: docs(),
       dialyzer: [
@@ -96,7 +97,15 @@ defmodule AshMetrics.MixProject do
   defp aliases do
     [
       "spark.cheat_sheets": "spark.cheat_sheets --extensions AshMetrics",
-      docs: ["spark.cheat_sheets", "docs", "spark.replace_doc_links"]
+      docs: ["spark.cheat_sheets", "docs", "spark.replace_doc_links"],
+      # `mix test` never touches a database. The tests that do are tagged
+      # `:postgres`, excluded by default, and run by this alias against the
+      # container in `docker-compose.yml`.
+      "test.integration": [
+        "ecto.create --quiet",
+        "ecto.migrate --quiet",
+        "test --include postgres"
+      ]
     ]
   end
 
@@ -106,6 +115,11 @@ defmodule AshMetrics.MixProject do
       {:spark, "~> 2.2"},
       {:telemetry, "~> 1.0"},
       {:telemetry_metrics, "~> 1.0"},
+      # Only the Postgres integration suite needs a SQL data layer. It is
+      # tagged `:postgres` and excluded from `mix test`; see `mix
+      # test.integration`. `:dev` is in the list only because `.formatter.exs`
+      # imports it, and `mix format` runs in `:dev`.
+      {:ash_postgres, "~> 2.13", only: [:dev, :test]},
       # Required by the Spark.Formatter plugin in .formatter.exs.
       {:sourceror, "~> 1.7", only: [:dev, :test], runtime: false},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
