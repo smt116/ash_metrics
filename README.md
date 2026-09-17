@@ -71,7 +71,7 @@ config :ash_metrics,
   tag_extractor: AshMetrics.TagExtractor.Default,
   backend: AshMetrics.Backend.Noop,
   poller: AshMetrics.Poller.GenServer,
-  tenant_source: MyApp.Tenants                      # :context multitenancy only
+  tenant_source: MyApp.Tenants                      # per-tenant gauges only
 
 # Only when the Oban poller is chosen; see "Polling with Oban".
 config :ash_metrics, AshMetrics.Poller.AshOban,

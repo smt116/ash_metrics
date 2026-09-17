@@ -3,9 +3,10 @@ defmodule AshMetrics.Verifiers.VerifyTenantSource do
   Rejects a multitenant resource that declares a gauge which has to be polled
   per tenant while `tenant_source` is unset.
 
-  Two shapes have to be: a resource using the `:context` strategy, whose
-  tenants each have their own schema, and a resource using the `:attribute`
-  strategy without `global? true`, which Ash refuses to read without a tenant.
+  Two shapes have to be polled per tenant: a resource using the `:context`
+  strategy, whose tenants each have their own schema, and a resource using the
+  `:attribute` strategy without `global? true`, which Ash refuses to read
+  without a tenant.
   Nothing but the application can say which tenants exist, so without a source
   such a gauge would be polled for no tenant at all and emit nothing — a metric
   that looks configured and reports nothing, which is the failure this package

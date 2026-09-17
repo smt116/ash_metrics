@@ -50,8 +50,8 @@ defmodule AshMetrics.Gauge.Strategy do
   ## Options
 
   * `:tenant` — the tenant to run the query as, or `nil`. Set for a resource
-    using Ash's `:context` multitenancy strategy, where the strategy is called
-    once per tenant.
+    that is polled once per tenant: one using Ash's `:context` multitenancy
+    strategy, or its `:attribute` strategy without `global? true`.
 
   Returns `{:error, reason}` rather than raising, so that one failing gauge
   neither takes the poller down nor stops the others from being emitted.

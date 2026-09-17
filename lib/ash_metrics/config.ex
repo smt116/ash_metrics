@@ -16,8 +16,8 @@ defmodule AshMetrics.Config do
         poller: AshMetrics.Poller.GenServer
 
   `tenant_source` has no default and is not required either: it is needed only
-  by an application whose resources use Ash's `:context` multitenancy strategy
-  and declare gauges.
+  by an application that declares a gauge on a resource which has to be polled
+  per tenant. See `AshMetrics.TenantSource`.
 
       config :ash_metrics, tenant_source: MyApp.Tenants
 
@@ -155,19 +155,14 @@ defmodule AshMetrics.Config do
   @doc """
   The configured `AshMetrics.TenantSource`, or `nil` when there is none.
 
-  There is no default: only an application whose resources use Ash's
-  `:context` multitenancy strategy needs one, and no default could enumerate
-  its tenants.
+  There is no default: only an application that declares a gauge on a resource
+  which has to be polled per tenant needs one. See `AshMetrics.TenantSource`.
   """
   @spec tenant_source() :: module() | nil
   def tenant_source, do: Application.get_env(@app, :tenant_source)
 
   @doc """
   The configured `AshMetrics.TenantSource`, raising when there is none.
-
-  Raises rather than returning an empty list of tenants, because a gauge on a
-  `:context` multitenant resource that is polled for no tenants emits nothing
-  at all, which is indistinguishable from a working metric whose value is zero.
   """
   @spec tenant_source!() :: module()
   def tenant_source! do
@@ -185,9 +180,9 @@ defmodule AshMetrics.Config do
 
             config :ash_metrics, tenant_source: MyApp.Tenants
 
-        A gauge on a resource using Ash's `:context` multitenancy strategy is
-        polled once per tenant, and only the application can say which
-        tenants exist.
+        A gauge on a resource using Ash's `:context` multitenancy strategy, or
+        its `:attribute` strategy without `global? true`, is polled once per
+        tenant, and only the application can say which tenants exist.
         """
     end
   end

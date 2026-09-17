@@ -70,8 +70,8 @@ if Code.ensure_loaded?(Igniter) do
 
     `poller` belongs in `config/config.exs` with the two keys that were
     written: it is read while resources compile. `tenant_source` is needed
-    only by an application whose resources use Ash's `:context` multitenancy
-    strategy and declare gauges.
+    only by an application that declares a gauge on a resource which has to be
+    polled per tenant.
     """
 
     # Printed when nothing in the application looks like the module a

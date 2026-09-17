@@ -12,8 +12,10 @@ defmodule AshMetrics.Backend.Test do
   declaration produces, not the `.count` or `.duration` variant a reporter
   publishes — because that is the name a test author wrote and can recognise.
 
-  Handlers are keyed by the receiving process, so concurrent tests do not
-  collide and each attaches and detaches its own.
+  Handlers are keyed by the receiving process, so each test attaches and
+  detaches its own. `:telemetry` handlers are still global: an attachment is
+  invoked for an emission from any process. See `AshMetrics.Test` on keeping
+  such modules `async: false`.
 
   `AshMetrics.Test` wires all of this up, and is what a test suite should use;
   reach for this module directly only when the assertion helpers are not what
