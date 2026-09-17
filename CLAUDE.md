@@ -25,6 +25,27 @@ them and needs the container from this repository's `docker-compose.yml`
 (`docker compose up -d`, `docker compose stop`). Drive only that compose file,
 only from the repository root; never touch another container on the machine.
 
+## Documentation
+
+Applies to every `@moduledoc`, `@doc`, `@typedoc`, `describe:` text and `#`
+comment, in `lib/` and `test/` alike.
+
+- **State the contract, not the reasoning.** What a thing is for, its inputs,
+  outputs, options, errors and guarantees, and the constraints or caveats a
+  caller must know. Nothing else.
+- **Never defend a decision.** No paragraph explaining why this name, why a
+  module rather than a capture, why compile time, why an earlier approach was
+  rejected. No "deliberately", "on purpose", "rather than X, which would...".
+  Where a choice has a consequence the reader must act on, state the
+  consequence in one sentence and stop.
+- **One fact, one home.** Document each fact in the module whose code enforces
+  it; everywhere else says nothing or cross-references it in a single
+  sentence. The same explanation in a moduledoc, a function doc, the README and
+  the CHANGELOG is three copies too many.
+- **Reference register, not blog.** No rhetorical openers or closers, no
+  self-referential asides. A comment earns its place when deleting it would let
+  a maintainer make a wrong change; otherwise delete it.
+
 ## Design principles
 
 These are decisions already made. Do not relitigate them in code.
