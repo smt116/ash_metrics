@@ -13,6 +13,13 @@ defmodule AshMetrics.Poller do
 
       config :ash_metrics, poller: AshMetrics.Poller.GenServer
 
+  A single resource may be polled by another, which is what an application
+  that wants one backlog on its job queue and the rest on a timer declares:
+
+      metrics do
+        poller AshMetrics.Poller.AshOban
+      end
+
   Splice `child_specs/1` into a supervision tree to start it:
 
       children = [MyApp.Repo, MyAppWeb.Endpoint] ++ AshMetrics.Poller.child_specs()
@@ -38,16 +45,34 @@ defmodule AshMetrics.Poller do
   @callback child_specs(gauges :: [gauge()], opts :: keyword()) :: [Supervisor.child_spec()]
 
   @doc """
-  The child specifications to add to a supervision tree for the configured
-  poller.
+  The child specifications to add to a supervision tree for every poller in
+  use.
 
   Every gauge of every resource reachable from the configured
   `AshMetrics.Config.otp_app!/0` is discovered, exactly as `AshMetrics.metrics/0`
-  discovers metrics, and handed to the poller in one go.
+  discovers metrics, and grouped by the poller that `AshMetrics.Info.poller/1`
+  says polls it. Each poller is then asked once, for its own gauges only, and
+  the results are concatenated in a stable order — by poller module name — so
+  that a supervision tree does not reshuffle between compilations.
+
+  An application that declares no gauges at all still gets the configured
+  poller's children, which is what keeps its supervision tree the same shape
+  before and after the first gauge is declared.
   """
   @spec child_specs(keyword()) :: [Supervisor.child_spec()]
   def child_specs(opts \\ []) do
-    Config.poller().child_specs(gauges(), opts)
+    gauges()
+    |> by_poller()
+    |> Enum.sort_by(fn {poller, _gauges} -> poller end)
+    |> Enum.flat_map(fn {poller, gauges} -> poller.child_specs(gauges, opts) end)
+  end
+
+  @spec by_poller([gauge()]) :: %{module() => [gauge()]}
+  defp by_poller(gauges) do
+    case Enum.group_by(gauges, fn {resource, _gauge} -> Info.poller(resource) end) do
+      grouped when map_size(grouped) == 0 -> %{Config.poller() => []}
+      grouped -> grouped
+    end
   end
 
   @doc """

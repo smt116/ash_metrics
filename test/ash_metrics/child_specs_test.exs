@@ -35,10 +35,14 @@ defmodule AshMetrics.ChildSpecsTest do
     assert AshMetrics.child_specs() == Poller.child_specs()
   end
 
-  test "is the backend followed by the poller" do
+  test "is the backend followed by the pollers" do
     Application.put_env(:ash_metrics, :backend, Reporter)
 
-    assert [%{id: Reporter}, %{id: AshMetrics.Poller.GenServer}] = AshMetrics.child_specs()
+    assert [
+             %{id: Reporter},
+             %{id: AshMetrics.Poller.GenServer},
+             %{id: AshMetrics.Test.MarkerPoller}
+           ] = AshMetrics.child_specs()
   end
 
   test "passes its options to both" do
@@ -46,7 +50,7 @@ defmodule AshMetrics.ChildSpecsTest do
 
     assert [
              %{start: {Agent, :start_link, [state]}},
-             %{start: {_poller, :start_link, [args]}}
+             %{start: {_poller, :start_link, [args]}} | _rest
            ] = AshMetrics.child_specs(name: :metrics)
 
     assert state.() == [name: :metrics]
@@ -60,6 +64,7 @@ defmodule AshMetrics.ChildSpecsTest do
              Supervisor.start_link(AshMetrics.child_specs(), strategy: :one_for_one)
 
     assert [
+             {AshMetrics.Test.MarkerPoller, _marker, :worker, _marker_modules},
              {AshMetrics.Poller.GenServer, _poller, :worker, _poller_modules},
              {Reporter, _agent, :worker, _agent_modules}
            ] =

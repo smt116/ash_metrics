@@ -104,6 +104,7 @@ end
 | Name | Type | Default | Docs |
 |------|------|---------|------|
 | [`name`](#metrics-name){: #metrics-name } | `atom` |  | Overrides the resource short name used in metric names. |
+| [`poller`](#metrics-poller){: #metrics-poller } | `module` |  | Overrides the configured `AshMetrics.Poller` for this resource's gauges. Every poller of an application is asked for its children, so two resources may be polled by two different mechanisms. |
 
 
 

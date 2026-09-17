@@ -226,6 +226,12 @@ defmodule AshMetrics.Dsl do
         type: :atom,
         required: false,
         doc: "Overrides the resource short name used in metric names."
+      ],
+      poller: [
+        type: {:behaviour, AshMetrics.Poller},
+        required: false,
+        doc:
+          "Overrides the configured `AshMetrics.Poller` for this resource's gauges. Every poller of an application is asked for its children, so two resources may be polled by two different mechanisms."
       ]
     ],
     entities: [@counter, @gauge, @distribution]

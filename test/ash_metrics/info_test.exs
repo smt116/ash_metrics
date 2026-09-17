@@ -8,6 +8,8 @@ defmodule AshMetrics.InfoTest do
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.MarkedJob
+  alias AshMetrics.Test.MarkerPoller
   alias AshMetrics.Test.Plain
 
   describe "metrics/1" do
@@ -112,6 +114,20 @@ defmodule AshMetrics.InfoTest do
 
     test "falls back to the resource short name" do
       assert Info.name(Invoice) == :invoice
+    end
+  end
+
+  describe "poller/1" do
+    test "falls back to the configured poller" do
+      assert Info.poller(Job) == AshMetrics.Poller.GenServer
+    end
+
+    test "uses the declared poller when the metrics section sets one" do
+      assert Info.poller(MarkedJob) == MarkerPoller
+    end
+
+    test "falls back to the configured poller for a resource with no metrics" do
+      assert Info.poller(Plain) == AshMetrics.Poller.GenServer
     end
   end
 end

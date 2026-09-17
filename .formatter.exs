@@ -16,6 +16,7 @@ spark_locals_without_parens = [
   name: 1,
   outcomes: 1,
   period: 1,
+  poller: 1,
   strategy: 1,
   tags: 1,
   unit: 1
