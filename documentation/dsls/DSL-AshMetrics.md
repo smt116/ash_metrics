@@ -82,8 +82,7 @@ metrics do
   name :templated_delivery
 
   counter :delivery,
-    outcomes: [:queued, :sent, :bounced, :delivered, :error],
-    tags: [:provider, :template]
+    tags: [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]]
 
   gauge :backlog,
     filter: expr(status in [:pending, :processing]),
@@ -93,7 +92,7 @@ metrics do
   distribution :send_latency,
     unit: {:native, :millisecond},
     buckets: [10, 50, 100, 250, 500, 1_000, 5_000],
-    tags: [:provider]
+    tags: [provider: [:ses, :smtp]]
 end
 
 ```
@@ -117,28 +116,28 @@ counter name
 
 
 Declares a counter: how many times a business event happened, broken down by
-outcome.
-
-`outcomes` is the closed set of permitted values for the `outcome` tag: a
-counter with five outcomes is one metric name carrying five tag values, not
-five metric names. Emitting an outcome that is not declared raises.
+its tags.
 
 `tags` is an allowlist. Only the keys listed here may be passed as call-site
-tags.
+tags. An entry written `key: [value, ...]` closes the tag to those values:
+every emission must carry it, with one of them, and one metric name carries
+the whole enumeration. An entry written `key` is open, and a call site may
+pass any value or none at all.
+
+`outcomes` declares the same thing for the configured outcome tag.
 
 
 
 
 ### Examples
 ```
-counter :delivery, outcomes: [:sent, :bounced, :error]
+counter :delivery, tags: [status: [:sent, :bounced, :error]]
 ```
 
 ```
 counter :delivery do
-  outcomes [:queued, :sent, :bounced, :delivered, :error]
-  tags [:provider, :template]
-  description "Templated deliveries by outcome"
+  tags [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]]
+  description "Templated deliveries by status"
 end
 
 ```
@@ -154,8 +153,8 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`outcomes`](#metrics-counter-outcomes){: #metrics-counter-outcomes .spark-required} | `list(atom)` |  | The permitted values of the outcome tag. Must be non-empty and free of duplicates. |
-| [`tags`](#metrics-counter-tags){: #metrics-counter-tags } | `list(atom)` | `[]` | The tag keys this counter accepts at the call site, beyond the outcome tag. |
+| [`outcomes`](#metrics-counter-outcomes){: #metrics-counter-outcomes } | `list(atom)` |  | The permitted values of the outcome tag. Equivalent to a closed entry for that tag in `tags`. |
+| [`tags`](#metrics-counter-tags){: #metrics-counter-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this counter accepts at the call site. An entry with a list of values closes the tag to them and requires it on every emission. |
 | [`description`](#metrics-counter-description){: #metrics-counter-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 
 
@@ -238,12 +237,13 @@ distribution name
 Declares a distribution: the spread of an observed numeric value, such as
 latency or payload size.
 
-Values are observed one at a time; the histogram itself is built by the
-reporter. `buckets` are reporter specific boundaries, passed through
-untouched, and `unit` may be a conversion tuple, so a call site can observe
-a native time unit without converting first.
+The call site measures the value. Values are observed one at a time; the
+histogram itself is built by the reporter. `buckets` are reporter specific
+boundaries, passed through untouched, and `unit` may be a conversion tuple,
+so a call site can observe a native time unit without converting first.
 
-As with counters, `tags` is an allowlist of the keys a call site may pass.
+As with counters, `tags` is an allowlist of the keys a call site may pass,
+and an entry written `key: [value, ...]` closes the tag to those values.
 
 
 
@@ -257,7 +257,7 @@ distribution :send_latency, unit: {:native, :millisecond}
 distribution :send_latency do
   unit {:native, :millisecond}
   buckets [10, 50, 100, 250, 500, 1_000, 5_000]
-  tags [:provider]
+  tags [provider: [:ses, :smtp]]
   description "Time from enqueue to provider acknowledgement"
 end
 
@@ -276,7 +276,7 @@ end
 |------|------|---------|------|
 | [`unit`](#metrics-distribution-unit){: #metrics-distribution-unit } | `atom \| {atom, atom}` | `:unit` | The unit of the observed value, or a `Telemetry.Metrics` conversion tuple such as `{:native, :millisecond}`. |
 | [`buckets`](#metrics-distribution-buckets){: #metrics-distribution-buckets } | `list(number)` |  | Histogram bucket boundaries, strictly ascending and positive. Passed to the reporter as `reporter_options[:buckets]`. |
-| [`tags`](#metrics-distribution-tags){: #metrics-distribution-tags } | `list(atom)` | `[]` | The tag keys this distribution accepts at the call site. |
+| [`tags`](#metrics-distribution-tags){: #metrics-distribution-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this distribution accepts at the call site. An entry with a list of values closes the tag to them and requires it on every observation. |
 | [`description`](#metrics-distribution-description){: #metrics-distribution-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 
 

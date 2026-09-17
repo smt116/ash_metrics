@@ -19,21 +19,43 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert Exception.message(error) =~ "metric :delivery is declared more than once"
   end
 
-  test "a counter must declare at least one outcome" do
-    assert [%DslError{} = error] = errors(quote(do: counter(:delivery, outcomes: [])))
+  test "a closed tag must declare at least one value" do
+    assert [%DslError{} = error] = errors(quote(do: counter(:delivery, tags: [status: []])))
 
     message = Exception.message(error)
 
-    assert message =~ "counter :delivery declares no outcomes"
-    assert message =~ "permitted values of the :outcome tag"
+    assert message =~ "counter :delivery declares no values for the tag :status"
+    assert message =~ "A closed tag lists at least one value."
   end
 
-  test "a counter may not declare the same outcome twice" do
+  test "a closed tag may not declare the same value twice" do
     assert [%DslError{} = error] =
-             errors(quote(do: counter(:delivery, outcomes: [:sent, :error, :sent])))
+             errors(quote(do: counter(:delivery, tags: [status: [:sent, :error, :sent]])))
 
     assert Exception.message(error) =~
-             "counter :delivery declares the outcome :sent more than once"
+             "counter :delivery declares the value :sent of the tag :status more than once"
+  end
+
+  test "a closed tag of a distribution is checked too" do
+    assert [%DslError{} = error] =
+             errors(quote(do: distribution(:send_latency, tags: [provider: []])))
+
+    assert Exception.message(error) =~
+             "distribution :send_latency declares no values for the tag :provider"
+  end
+
+  test "an outcomes declaration is checked as the values of the outcome tag" do
+    assert [%DslError{} = error] = errors(quote(do: counter(:delivery, outcomes: [])))
+
+    assert Exception.message(error) =~ "counter :delivery declares no values for the tag :outcome"
+  end
+
+  test "a counter may not declare a tag key twice across the two forms" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [:status, status: [:sent]])))
+
+    assert Exception.message(error) =~
+             "counter :delivery declares the tag :status more than once"
   end
 
   test "a counter may not declare the same tag twice" do
@@ -54,19 +76,17 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
              "distribution :send_latency declares the tag :provider more than once"
   end
 
-  test "the outcome tag is reserved" do
+  test "an outcomes declaration collides with an explicit tag for the outcome key" do
     assert [%DslError{} = error] =
              errors(quote(do: counter(:delivery, outcomes: [:sent], tags: [:outcome])))
 
-    message = Exception.message(error)
-
-    assert message =~ "declares the tag :outcome, which is reserved"
-    assert message =~ "config :ash_metrics, outcome_tag: :outcome"
+    assert Exception.message(error) =~
+             "counter :delivery declares the tag :outcome more than once"
   end
 
   test "a tag the extractor supplies is reserved" do
     assert [%DslError{} = error] =
-             errors(quote(do: counter(:delivery, outcomes: [:sent], tags: [:tenant])))
+             errors(quote(do: counter(:delivery, tags: [:tenant, status: [:sent]])))
 
     message = Exception.message(error)
 
@@ -158,6 +178,15 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
              quote do
                counter :delivery, outcomes: [:sent, :error], tags: [:provider]
                distribution :send_latency, unit: {:native, :millisecond}, buckets: [10, 50.5, 100]
+             end
+           ) == []
+  end
+
+  test "a valid declaration with closed tags produces no errors" do
+    assert errors(
+             quote do
+               counter :delivery, tags: [:provider, status: [:sent, :error]]
+               distribution :send_latency, tags: [{:provider, [:ses]}, :template]
              end
            ) == []
   end

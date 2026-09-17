@@ -21,6 +21,7 @@ defmodule AshMetrics.IncrementTest do
   alias AshMetrics.Test.Invoice
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.Plain
+  alias AshMetrics.Test.Shipment
 
   setup do
     handler = "ash-metrics-increment-#{System.unique_integer([:positive])}"
@@ -31,7 +32,8 @@ defmodule AshMetrics.IncrementTest do
       handler,
       [
         AshMetrics.event_name(Delivery, :delivery),
-        AshMetrics.event_name(Invoice, :capture)
+        AshMetrics.event_name(Invoice, :capture),
+        AshMetrics.event_name(Shipment, :dispatch)
       ],
       &__MODULE__.handle_event/4,
       %{pid: test_process}
@@ -158,23 +160,23 @@ defmodule AshMetrics.IncrementTest do
       end
     end
 
-    test "raises when no outcome is given, listing the declared outcomes" do
+    test "raises when a closed tag is missing, naming it and its declared values" do
       error = assert_raise ArgumentError, fn -> AshMetrics.increment(Invoice, :capture, []) end
 
       assert error.message ==
-               "increment/3 requires an `outcome:` option. Counter :capture on " <>
-                 "AshMetrics.Test.Invoice declares the outcomes: :succeeded, :failed"
+               ":outcome is a required tag of counter :capture on " <>
+                 "AshMetrics.Test.Invoice. Declared values: :succeeded, :failed"
     end
 
-    test "raises when the outcome is not declared, listing the declared outcomes" do
+    test "raises when a closed tag's value is not declared, listing the declared values" do
       error =
         assert_raise ArgumentError, fn ->
           AshMetrics.increment(Invoice, :capture, outcome: :sent)
         end
 
       assert error.message ==
-               ":sent is not a declared outcome of counter :capture on " <>
-                 "AshMetrics.Test.Invoice. Declared outcomes: :succeeded, :failed"
+               ":sent is not a declared value of the tag :outcome of counter :capture " <>
+                 "on AshMetrics.Test.Invoice. Declared values: :succeeded, :failed"
     end
 
     test "raises when a tag is not declared, naming it and the declared tags" do
@@ -185,16 +187,16 @@ defmodule AshMetrics.IncrementTest do
 
       assert error.message ==
                ":region is not a declared tag of counter :delivery on " <>
-                 "AshMetrics.Test.Delivery. Declared tags: :provider, :template"
+                 "AshMetrics.Test.Delivery. Declared tags: :outcome, :provider, :template"
     end
 
-    test "raises for any tag when the counter declares none" do
+    test "raises for any tag beyond the declared ones" do
       error =
         assert_raise ArgumentError, fn ->
           AshMetrics.increment(Invoice, :capture, outcome: :failed, tags: %{provider: "ses"})
         end
 
-      assert error.message =~ "Declared tags: none"
+      assert error.message =~ "Declared tags: :outcome"
     end
 
     test "emits nothing when validation fails" do
@@ -203,6 +205,45 @@ defmodule AshMetrics.IncrementTest do
       end
 
       refute_received {:emitted, _event, _measurements, _metadata}
+    end
+  end
+
+  describe "increment/3 with closed tags" do
+    test "carries a closed tag and an open one" do
+      assert AshMetrics.increment(Shipment, :dispatch, tags: %{status: :shipped, carrier: "ups"}) ==
+               :ok
+
+      assert_received {:emitted, event, measurements, metadata}
+      assert event == [:ash_metrics, AshMetrics.Test.Shipment, :dispatch]
+      assert measurements == %{count: 1}
+      assert metadata == %{status: :shipped, carrier: "ups"}
+    end
+
+    test "leaves an open tag optional" do
+      AshMetrics.increment(Shipment, :dispatch, tags: %{status: :queued})
+
+      assert_received {:emitted, _event, _measurements, metadata}
+
+      assert metadata == %{status: :queued}
+    end
+
+    test "raises when a closed tag is missing, naming it and its declared values" do
+      error = assert_raise ArgumentError, fn -> AshMetrics.increment(Shipment, :dispatch, []) end
+
+      assert error.message ==
+               ":status is a required tag of counter :dispatch on " <>
+                 "AshMetrics.Test.Shipment. Declared values: :queued, :shipped, :lost"
+    end
+
+    test "raises when a closed tag's value is not declared" do
+      error =
+        assert_raise ArgumentError, fn ->
+          AshMetrics.increment(Shipment, :dispatch, tags: %{status: :nope})
+        end
+
+      assert error.message ==
+               ":nope is not a declared value of the tag :status of counter :dispatch " <>
+                 "on AshMetrics.Test.Shipment. Declared values: :queued, :shipped, :lost"
     end
   end
 end

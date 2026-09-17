@@ -6,10 +6,10 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
 
   * metric names are unique — counters, gauges and distributions share one
     namespace, because they share one metric name
-  * a counter declares at least one outcome, and no outcome twice
   * tag keys are not repeated
-  * tag keys do not collide with the outcome tag or with the keys the
-    configured `AshMetrics.TagExtractor` adds
+  * tag keys do not collide with the keys the configured
+    `AshMetrics.TagExtractor` adds
+  * a closed tag declares at least one value, and no value twice
   * bucket boundaries are a non-empty, strictly ascending list of positive
     numbers
   * a gauge groups by attributes of the resource, and by none of them twice
@@ -62,9 +62,7 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     end
   end
 
-  defp verify_metric(dsl_state, %Counter{} = counter) do
-    with :ok <- verify_outcomes(dsl_state, counter), do: verify_tags(dsl_state, counter)
-  end
+  defp verify_metric(dsl_state, %Counter{} = counter), do: verify_tags(dsl_state, counter)
 
   defp verify_metric(dsl_state, %Distribution{} = distribution) do
     with :ok <- verify_tags(dsl_state, distribution),
@@ -113,33 +111,10 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     dsl_state |> ResourceInfo.attributes() |> Enum.map(& &1.name) |> list()
   end
 
-  defp verify_outcomes(dsl_state, %Counter{outcomes: []} = counter) do
-    error(
-      dsl_state,
-      counter,
-      "counter #{inspect(counter.name)} declares no outcomes. The outcomes are " <>
-        "the permitted values of the #{inspect(Config.outcome_tag())} tag, so at " <>
-        "least one is required."
-    )
-  end
-
-  defp verify_outcomes(dsl_state, %Counter{} = counter) do
-    case duplicates(counter.outcomes) do
-      [] ->
-        :ok
-
-      duplicated ->
-        error(
-          dsl_state,
-          counter,
-          "counter #{inspect(counter.name)} declares the outcome " <>
-            "#{list(duplicated)} more than once."
-        )
-    end
-  end
-
   defp verify_tags(dsl_state, metric) do
-    with :ok <- verify_unique_tags(dsl_state, metric), do: verify_reserved_tags(dsl_state, metric)
+    with :ok <- verify_unique_tags(dsl_state, metric),
+         :ok <- verify_reserved_tags(dsl_state, metric),
+         do: verify_tag_values(dsl_state, metric)
   end
 
   defp verify_unique_tags(dsl_state, metric) do
@@ -158,30 +133,56 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   end
 
   defp verify_reserved_tags(dsl_state, metric) do
-    outcome_tag = Config.outcome_tag()
     extractor = Config.tag_extractor()
-    reserved = [outcome_tag | extractor.tag_keys()]
 
-    case Enum.filter(metric.tags, &(&1 in reserved)) do
+    case Enum.filter(metric.tags, &(&1 in extractor.tag_keys())) do
       [] ->
         :ok
 
       [tag | _rest] ->
-        error(dsl_state, metric, reserved_message(metric, tag, outcome_tag, extractor))
+        error(
+          dsl_state,
+          metric,
+          "#{kind(metric)} #{inspect(metric.name)} declares the tag #{inspect(tag)}, " <>
+            "which is reserved: it comes from the configured tag extractor " <>
+            "#{inspect(extractor)}, which adds it to every emission."
+        )
     end
   end
 
-  defp reserved_message(metric, tag, outcome_tag, _extractor) when tag == outcome_tag do
-    "#{kind(metric)} #{inspect(metric.name)} declares the tag #{inspect(tag)}, " <>
-      "which is reserved: it is the outcome tag, set by " <>
-      "`config :ash_metrics, outcome_tag: #{inspect(outcome_tag)}`, and is added " <>
-      "to every counter emission."
+  defp verify_tag_values(dsl_state, metric) do
+    Enum.reduce_while(metric.tags, :ok, fn tag, :ok ->
+      case verify_values(dsl_state, metric, tag, Map.get(metric.tag_values, tag)) do
+        :ok -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
   end
 
-  defp reserved_message(metric, tag, _outcome_tag, extractor) do
-    "#{kind(metric)} #{inspect(metric.name)} declares the tag #{inspect(tag)}, " <>
-      "which is reserved: it comes from the configured tag extractor " <>
-      "#{inspect(extractor)}, which adds it to every emission."
+  defp verify_values(_dsl_state, _metric, _tag, nil), do: :ok
+
+  defp verify_values(dsl_state, metric, tag, []) do
+    error(
+      dsl_state,
+      metric,
+      "#{kind(metric)} #{inspect(metric.name)} declares no values for the tag " <>
+        "#{inspect(tag)}. A closed tag lists at least one value."
+    )
+  end
+
+  defp verify_values(dsl_state, metric, tag, values) do
+    case duplicates(values) do
+      [] ->
+        :ok
+
+      duplicated ->
+        error(
+          dsl_state,
+          metric,
+          "#{kind(metric)} #{inspect(metric.name)} declares the value " <>
+            "#{list(duplicated)} of the tag #{inspect(tag)} more than once."
+        )
+    end
   end
 
   defp verify_buckets(_dsl_state, %Distribution{buckets: nil}), do: :ok

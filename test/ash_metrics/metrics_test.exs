@@ -26,6 +26,7 @@ defmodule AshMetrics.MetricsTest do
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.Plain
   alias AshMetrics.Test.SchemaJob
+  alias AshMetrics.Test.Shipment
   alias AshMetrics.Test.TenantJob
   alias Telemetry.Metrics.Counter
   alias Telemetry.Metrics.Distribution
@@ -98,6 +99,14 @@ defmodule AshMetrics.MetricsTest do
     test "tags a counter with no declared tags with the outcome and extractor keys only" do
       assert [%Counter{tags: [:outcome, :tenant]}, %Distribution{}] =
                AshMetrics.metrics_for([Invoice])
+    end
+
+    test "tags a metric with every declared key, closed or open, plus the extractor keys" do
+      assert [%Counter{} = counter, %Distribution{} = distribution] =
+               AshMetrics.metrics_for([Shipment])
+
+      assert counter.tags == [:carrier, :status, :tenant]
+      assert distribution.tags == [:carrier, :region, :tenant]
     end
 
     test "compiles a gauge into a Telemetry.Metrics.LastValue" do
@@ -175,6 +184,8 @@ defmodule AshMetrics.MetricsTest do
                [:test, :mailings, :templated_delivery, :send_latency, :duration],
                [:test, :mailings, :invoice, :capture, :count],
                [:test, :mailings, :invoice, :settlement_lag, :duration],
+               [:test, :mailings, :shipment, :dispatch, :count],
+               [:test, :mailings, :shipment, :transit_time, :duration],
                [:test, :queue, :job, :backlog, :gauge],
                [:test, :queue, :job, :total, :gauge],
                [:test, :queue, :tenant_job, :backlog, :gauge],

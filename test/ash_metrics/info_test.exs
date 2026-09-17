@@ -11,31 +11,48 @@ defmodule AshMetrics.InfoTest do
   alias AshMetrics.Test.MarkedJob
   alias AshMetrics.Test.MarkerPoller
   alias AshMetrics.Test.Plain
+  alias AshMetrics.Test.Shipment
 
   describe "metrics/1" do
     test "returns the declarations of a resource in declaration order" do
       assert [%Counter{} = counter, %Distribution{} = distribution] = Info.metrics(Delivery)
 
       assert counter.name == :delivery
-      assert counter.outcomes == [:queued, :sent, :bounced, :delivered, :error]
-      assert counter.tags == [:provider, :template]
+      assert counter.tags == [:outcome, :provider, :template]
+      assert counter.tag_values == %{outcome: [:queued, :sent, :bounced, :delivered, :error]}
       assert counter.description == "Templated deliveries by outcome"
 
       assert distribution.name == :send_latency
       assert distribution.unit == {:native, :millisecond}
       assert distribution.buckets == [10, 50, 100, 250, 500]
       assert distribution.tags == [:provider]
+      assert distribution.tag_values == %{}
       assert distribution.description == "Time from enqueue to provider acknowledgement"
+    end
+
+    test "normalizes a closed tag declared in keyword syntax" do
+      assert %Counter{} = counter = Info.metric!(Shipment, :dispatch)
+
+      assert counter.tags == [:carrier, :status]
+      assert counter.tag_values == %{status: [:queued, :shipped, :lost]}
+    end
+
+    test "normalizes a closed tag declared as a tuple, wherever it appears" do
+      assert %Distribution{} = distribution = Info.metric!(Shipment, :transit_time)
+
+      assert distribution.tags == [:carrier, :region]
+      assert distribution.tag_values == %{carrier: [:ups, :dhl]}
     end
 
     test "defaults tags to an empty list and description to nil" do
       assert [
-               %Counter{name: :capture, tags: [], description: nil},
+               %Counter{name: :capture, tags: [:outcome], description: nil},
                %Distribution{
                  name: :settlement_lag,
                  unit: :unit,
                  buckets: nil,
                  tags: [],
+                 tag_values: %{},
                  description: nil
                }
              ] = Info.metrics(Invoice)

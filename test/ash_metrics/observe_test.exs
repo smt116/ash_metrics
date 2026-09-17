@@ -20,6 +20,7 @@ defmodule AshMetrics.ObserveTest do
   alias AshMetrics.Test.Delivery
   alias AshMetrics.Test.Invoice
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.Shipment
 
   setup do
     handler = "ash-metrics-observe-#{System.unique_integer([:positive])}"
@@ -30,7 +31,8 @@ defmodule AshMetrics.ObserveTest do
       handler,
       [
         AshMetrics.event_name(Delivery, :send_latency),
-        AshMetrics.event_name(Invoice, :settlement_lag)
+        AshMetrics.event_name(Invoice, :settlement_lag),
+        AshMetrics.event_name(Shipment, :transit_time)
       ],
       &__MODULE__.handle_event/4,
       %{pid: test_process}
@@ -158,6 +160,46 @@ defmodule AshMetrics.ObserveTest do
       end
 
       refute_received {:emitted, _event, _measurements, _metadata}
+    end
+  end
+
+  describe "observe/4 with closed tags" do
+    test "carries a closed tag and an open one" do
+      assert AshMetrics.observe(Shipment, :transit_time, 42, tags: %{carrier: :ups, region: "eu"}) ==
+               :ok
+
+      assert_received {:emitted, event, measurements, metadata}
+      assert event == [:ash_metrics, AshMetrics.Test.Shipment, :transit_time]
+      assert measurements == %{value: 42}
+      assert metadata == %{carrier: :ups, region: "eu"}
+    end
+
+    test "leaves an open tag optional" do
+      AshMetrics.observe(Shipment, :transit_time, 42, tags: %{carrier: :dhl})
+
+      assert_received {:emitted, _event, _measurements, metadata}
+
+      assert metadata == %{carrier: :dhl}
+    end
+
+    test "raises when a closed tag is missing, naming it and its declared values" do
+      error =
+        assert_raise ArgumentError, fn -> AshMetrics.observe(Shipment, :transit_time, 42) end
+
+      assert error.message ==
+               ":carrier is a required tag of distribution :transit_time on " <>
+                 "AshMetrics.Test.Shipment. Declared values: :ups, :dhl"
+    end
+
+    test "raises when a closed tag's value is not declared" do
+      error =
+        assert_raise ArgumentError, fn ->
+          AshMetrics.observe(Shipment, :transit_time, 42, tags: %{carrier: :fedex})
+        end
+
+      assert error.message ==
+               ":fedex is not a declared value of the tag :carrier of distribution " <>
+                 ":transit_time on AshMetrics.Test.Shipment. Declared values: :ups, :dhl"
     end
   end
 end

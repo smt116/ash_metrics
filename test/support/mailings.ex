@@ -7,6 +7,7 @@ defmodule AshMetrics.Test.Mailings do
   resources do
     resource AshMetrics.Test.Delivery
     resource AshMetrics.Test.Invoice
+    resource AshMetrics.Test.Shipment
     resource AshMetrics.Test.Plain
   end
 end

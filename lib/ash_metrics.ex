@@ -101,13 +101,15 @@ defmodule AshMetrics do
   `ArgumentError`:
 
   * `metric` must be a declared `counter` on `resource`
-  * `outcome` must be one of that counter's declared outcomes
   * every key of `tags` must be one of that counter's declared tags
+  * every closed tag of that counter must be present, with one of its declared
+    values
 
   ## Options
 
-  * `:outcome` — required. The outcome the event ended in.
   * `:tags` — a map of call-site tags, defaulting to `%{}`.
+  * `:outcome` — the value of the configured outcome tag, if the counter
+    declares `outcomes`.
   * `:metadata` — a map passed to the configured `AshMetrics.TagExtractor`,
     defaulting to `%{}`. Anything shaped like Ash event metadata will do; a
     changeset's context is the usual thing to pass.
@@ -118,18 +120,34 @@ defmodule AshMetrics do
   ## Example
 
       AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
-        outcome: :bounced,
-        tags: %{provider: "ses"},
+        tags: %{status: :bounced, provider: "ses"},
         metadata: %{tenant: "acme"}
       )
   """
   @spec increment(module(), atom(), keyword()) :: :ok
   def increment(resource, metric, opts) do
     counter = counter!(resource, metric)
-    outcome = outcome!(resource, counter, opts)
-    tags = Map.put(tags(resource, counter, opts), Config.outcome_tag(), outcome)
+    tags = tags(resource, counter, with_outcome(opts))
 
     :telemetry.execute(event_name(resource, metric), %{count: 1}, tags)
+  end
+
+  @spec with_outcome(keyword()) :: keyword()
+  defp with_outcome(opts) do
+    case Keyword.fetch(opts, :outcome) do
+      {:ok, outcome} ->
+        outcome_tag = Config.outcome_tag()
+
+        Keyword.update(
+          opts,
+          :tags,
+          %{outcome_tag => outcome},
+          &Map.put(&1, outcome_tag, outcome)
+        )
+
+      :error ->
+        opts
+    end
   end
 
   @spec counter!(module(), atom()) :: Counter.t()
@@ -153,8 +171,9 @@ defmodule AshMetrics do
 
   As with `increment/3`, everything is checked before the event is executed and
   anything wrong raises `ArgumentError`: `metric` must be a declared
-  `distribution` on `resource`, `value` must be a number, and every key of
-  `tags` must be one of that distribution's declared tags.
+  `distribution` on `resource`, `value` must be a number, every key of `tags`
+  must be one of that distribution's declared tags, and every closed tag must
+  be present with one of its declared values.
 
   The value is recorded in whatever unit the declaration says. A declaration
   with a conversion unit such as `{:native, :millisecond}` converts when the
@@ -215,36 +234,11 @@ defmodule AshMetrics do
       "gauge is polled by AshMetrics itself and has no call site."
   end
 
-  @spec outcome!(module(), Counter.t(), keyword()) :: atom()
-  defp outcome!(resource, counter, opts) do
-    case Keyword.fetch(opts, :outcome) do
-      {:ok, outcome} -> declared_outcome!(resource, counter, outcome)
-      :error -> raise ArgumentError, missing_outcome_message(resource, counter)
-    end
-  end
-
-  @spec declared_outcome!(module(), Counter.t(), term()) :: atom()
-  defp declared_outcome!(resource, counter, outcome) do
-    if outcome in counter.outcomes do
-      outcome
-    else
-      raise ArgumentError,
-            "#{inspect(outcome)} is not a declared outcome of counter " <>
-              "#{inspect(counter.name)} on #{inspect(resource)}. Declared outcomes: " <>
-              list(counter.outcomes)
-    end
-  end
-
-  @spec missing_outcome_message(module(), Counter.t()) :: String.t()
-  defp missing_outcome_message(resource, counter) do
-    "increment/3 requires an `outcome:` option. Counter #{inspect(counter.name)} " <>
-      "on #{inspect(resource)} declares the outcomes: #{list(counter.outcomes)}"
-  end
-
   @spec tags(module(), Counter.t() | Distribution.t(), keyword()) :: tags()
   defp tags(resource, metric, opts) do
     explicit = Keyword.get(opts, :tags, %{})
     declared_tags!(resource, metric, explicit)
+    declared_values!(resource, metric, explicit)
 
     opts
     |> Keyword.get(:metadata, %{})
@@ -263,6 +257,44 @@ defmodule AshMetrics do
               "#{inspect(key)} is not a declared tag of #{kind(metric)} " <>
                 "#{inspect(metric.name)} on #{inspect(resource)}. Declared tags: " <>
                 list(metric.tags)
+    end
+  end
+
+  @spec declared_values!(module(), Counter.t() | Distribution.t(), tags()) :: :ok
+  defp declared_values!(resource, metric, explicit) do
+    Enum.each(metric.tags, fn key ->
+      case Map.fetch(metric.tag_values, key) do
+        {:ok, values} ->
+          declared_value!(resource, metric, key, values, Map.fetch(explicit, key))
+
+        :error ->
+          :ok
+      end
+    end)
+  end
+
+  @spec declared_value!(
+          module(),
+          Counter.t() | Distribution.t(),
+          atom(),
+          [atom()],
+          {:ok, term()} | :error
+        ) :: :ok
+  defp declared_value!(resource, metric, key, values, :error) do
+    raise ArgumentError,
+          "#{inspect(key)} is a required tag of #{kind(metric)} " <>
+            "#{inspect(metric.name)} on #{inspect(resource)}. Declared values: " <>
+            list(values)
+  end
+
+  defp declared_value!(resource, metric, key, values, {:ok, value}) do
+    if value in values do
+      :ok
+    else
+      raise ArgumentError,
+            "#{inspect(value)} is not a declared value of the tag #{inspect(key)} " <>
+              "of #{kind(metric)} #{inspect(metric.name)} on #{inspect(resource)}. " <>
+              "Declared values: " <> list(values)
     end
   end
 
@@ -317,9 +349,9 @@ defmodule AshMetrics do
   distribution a `Telemetry.Metrics.Distribution` named `<metric>.duration`,
   and a gauge a `Telemetry.Metrics.LastValue` named `<metric>.gauge`, where the
   part before the suffix is what the configured `AshMetrics.NameBuilder`
-  returns. A counter's and a distribution's tags are the declared tags plus the
-  keys the configured `AshMetrics.TagExtractor` supplies, plus the outcome tag
-  for a counter, which is exactly the set of keys an emission can carry.
+  returns. A counter's and a distribution's tags are the declared tag keys plus
+  the keys the configured `AshMetrics.TagExtractor` supplies, which is exactly
+  the set of keys an emission can carry.
 
   A gauge's tags are its `group_by` attributes, plus `tenant` when the resource
   is multitenant under either of Ash's strategies. The tag extractor's keys are
@@ -350,7 +382,7 @@ defmodule AshMetrics do
       NameBuilder.build(resource, counter.name) <> ".count",
       event_name: event_name(resource, counter.name),
       measurement: :count,
-      tags: [Config.outcome_tag() | counter.tags] ++ extractor_keys,
+      tags: counter.tags ++ extractor_keys,
       description: counter.description
     )
   end

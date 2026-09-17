@@ -10,9 +10,20 @@ defmodule AshMetrics.Dsl.Distribution do
   the observed value is converted for you. `buckets` are histogram boundaries;
   they are reporter specific, so they are passed through as
   `reporter_options[:buckets]` rather than interpreted here.
+
+  `tags` holds every declared tag key in declaration order and `tag_values` the
+  declared values of the closed ones; see `AshMetrics.Dsl.Tags`.
   """
 
-  defstruct [:name, :buckets, :description, unit: :unit, tags: [], __spark_metadata__: nil]
+  defstruct [
+    :name,
+    :buckets,
+    :description,
+    unit: :unit,
+    tags: [],
+    tag_values: %{},
+    __spark_metadata__: nil
+  ]
 
   @typedoc "A unit, or a `Telemetry.Metrics` unit conversion tuple."
   @type unit :: atom() | {atom(), atom()}
@@ -22,6 +33,7 @@ defmodule AshMetrics.Dsl.Distribution do
           unit: unit(),
           buckets: [number()] | nil,
           tags: [atom()],
+          tag_values: %{optional(atom()) => [atom()]},
           description: String.t() | nil,
           __spark_metadata__: Spark.Dsl.Entity.spark_meta() | nil
         }
