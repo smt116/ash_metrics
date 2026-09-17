@@ -23,6 +23,7 @@ defmodule AshMetrics.PollerTest do
   alias AshMetrics.Test.MarkerPoller
   alias AshMetrics.Test.ObanJob
   alias AshMetrics.Test.PgJob
+  alias AshMetrics.Test.PgObanJob
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
 
@@ -53,7 +54,8 @@ defmodule AshMetrics.PollerTest do
                {MarkedJob, :backlog},
                {ObanJob, :backlog},
                {PgJob, :backlog},
-               {PgJob, :total}
+               {PgJob, :total},
+               {PgObanJob, :backlog}
              ]
     end
 
@@ -126,6 +128,8 @@ defmodule AshMetrics.PollerTest do
   # Everything the configured poller is left with: `MarkedJob` names another
   # poller, and `ObanJob` is polled by Oban's cron rather than by a process.
   defp default_gauges do
-    Enum.reject(Poller.gauges(), fn {resource, _gauge} -> resource in [MarkedJob, ObanJob] end)
+    Enum.reject(Poller.gauges(), fn {resource, _gauge} ->
+      resource in [MarkedJob, ObanJob, PgObanJob]
+    end)
   end
 end

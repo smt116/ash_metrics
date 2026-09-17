@@ -6,5 +6,6 @@ defmodule AshMetrics.Test.Pg do
 
   resources do
     resource AshMetrics.Test.PgJob
+    resource AshMetrics.Test.PgObanJob
   end
 end
