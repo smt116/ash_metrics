@@ -5,6 +5,7 @@ defmodule AshMetrics.Poller.AshObanTest do
 
   alias AshMetrics.Poller
   alias AshMetrics.Poller.AshOban, as: ObanPoller
+  alias AshMetrics.Poller.AshOban.Memory
   alias AshMetrics.Test.Compiler
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.MarkerPoller
@@ -14,7 +15,12 @@ defmodule AshMetrics.Poller.AshObanTest do
 
   setup do
     Ets.clear!(ObanJob)
-    on_exit(fn -> Ets.clear!(ObanJob) end)
+    Memory.clear(ObanJob, :backlog)
+
+    on_exit(fn ->
+      Ets.clear!(ObanJob)
+      Memory.clear(ObanJob, :backlog)
+    end)
 
     :ok
   end
@@ -80,14 +86,61 @@ defmodule AshMetrics.Poller.AshObanTest do
       seed(:pending)
       seed(:processing)
 
-      assert Ash.run_action!(Ash.ActionInput.for_action(ObanJob, @action, %{})) == :ok
+      assert run() == :ok
 
       assert_metric_emitted("test.queue.oban_job.backlog", value: 2, tags: %{status: :pending})
       assert_metric_emitted("test.queue.oban_job.backlog", value: 1, tags: %{status: :processing})
     end
 
     test "emits nothing at all for an empty table" do
-      assert Ash.run_action!(Ash.ActionInput.for_action(ObanJob, @action, %{})) == :ok
+      assert run() == :ok
+
+      refute_metric_emitted("test.queue.oban_job.backlog")
+    end
+
+    test "remembers the groups it found, for the next run to zero" do
+      seed(:pending)
+
+      run()
+
+      assert Memory.get(ObanJob, :backlog) == [%{status: :pending}]
+    end
+
+    test "zeroes a group that drained between two runs" do
+      seed(:pending)
+      run()
+
+      assert_metric_emitted("test.queue.oban_job.backlog", value: 1, tags: %{status: :pending})
+
+      Ets.clear!(ObanJob)
+      run()
+
+      assert_metric_emitted("test.queue.oban_job.backlog", value: 0, tags: %{status: :pending})
+      assert Memory.get(ObanJob, :backlog) == []
+    end
+
+    test "zeroes a vanished group once, not on every run after it" do
+      seed(:pending)
+      run()
+      assert_metric_emitted("test.queue.oban_job.backlog", value: 1, tags: %{status: :pending})
+
+      Ets.clear!(ObanJob)
+      run()
+      assert_metric_emitted("test.queue.oban_job.backlog", value: 0, tags: %{status: :pending})
+
+      run()
+
+      refute_metric_emitted("test.queue.oban_job.backlog")
+    end
+
+    test "zeroes nothing on the first run of a node that remembers nothing" do
+      seed(:pending)
+      run()
+      assert_metric_emitted("test.queue.oban_job.backlog", value: 1, tags: %{status: :pending})
+
+      Ets.clear!(ObanJob)
+      Memory.clear(ObanJob, :backlog)
+      run()
 
       refute_metric_emitted("test.queue.oban_job.backlog")
     end
@@ -155,4 +208,7 @@ defmodule AshMetrics.Poller.AshObanTest do
   end
 
   defp seed(status), do: Ash.create!(ObanJob, %{status: status}, authorize?: false)
+
+  # Exactly what AshOban's generated worker does with the scheduled action.
+  defp run, do: Ash.run_action!(Ash.ActionInput.for_action(ObanJob, @action, %{}))
 end

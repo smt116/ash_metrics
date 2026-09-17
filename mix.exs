@@ -85,6 +85,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Poller.AshOban,
           AshMetrics.Poller.AshOban.Cron,
           AshMetrics.Poller.AshOban.Emit,
+          AshMetrics.Poller.AshOban.Memory,
           AshMetrics.Poller.AshOban.Transformer,
           AshMetrics.Poller.GenServer,
           AshMetrics.TagExtractor.Default

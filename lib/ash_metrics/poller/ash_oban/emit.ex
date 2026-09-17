@@ -11,6 +11,11 @@ defmodule AshMetrics.Poller.AshOban.Emit do
   inside AshOban's worker raises and the poll shows up as a failed Oban job.
   That is the whole reason to poll from a queue instead of a timer, which can
   only log.
+
+  The groups each poll found are handed to
+  `AshMetrics.Poller.AshOban.Memory`, so that the next poll can zero the ones
+  that have drained. A failed poll leaves that memory untouched: it says
+  nothing about which groups still exist, and forgetting would lose a zero.
   """
 
   use Ash.Resource.Actions.Implementation
@@ -18,6 +23,7 @@ defmodule AshMetrics.Poller.AshOban.Emit do
   alias Ash.Resource.Actions.Implementation.Context
   alias AshMetrics.Gauge.Runner
   alias AshMetrics.Info
+  alias AshMetrics.Poller.AshOban.Memory
 
   @doc """
   Polls the gauge named by `opts[:gauge]` and emits one measurement per group.
@@ -26,10 +32,11 @@ defmodule AshMetrics.Poller.AshOban.Emit do
   @spec run(Ash.ActionInput.t(), keyword(), Context.t()) :: :ok | {:error, term()}
   def run(input, opts, _context) do
     resource = input.resource
-    gauge = Info.metric!(resource, Keyword.fetch!(opts, :gauge))
+    name = Keyword.fetch!(opts, :gauge)
+    gauge = Info.metric!(resource, name)
 
-    case Runner.emit(resource, gauge, []) do
-      {:ok, _groups} -> :ok
+    case Runner.emit(resource, gauge, Memory.get(resource, name)) do
+      {:ok, groups} -> Memory.put(resource, name, groups)
       {:error, error} -> {:error, error}
     end
   end
