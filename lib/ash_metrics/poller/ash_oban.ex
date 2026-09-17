@@ -26,6 +26,12 @@ defmodule AshMetrics.Poller.AshOban do
         poller AshMetrics.Poller.AshOban
       end
 
+  The choice is read while the resource compiles, because that is when the
+  schedules are generated, so the configuration form belongs in
+  `config/config.exs` rather than `config/runtime.exs`. A poller that differs
+  between compile time and runtime leaves the gauges with no poller at all:
+  no schedules were generated, and the timer poller is not the one running.
+
   ## What the resource has to do
 
   The generated machinery is invisible, but it is not free of requirements.

@@ -22,8 +22,12 @@ defmodule AshMetrics.Config do
       config :ash_metrics, tenant_source: MyApp.Tenants
 
   The values are read on each call rather than captured in a module attribute,
-  so that a host application can override them from `config/runtime.exs` for
-  everything except `prefix`, which a compile-time verifier requires.
+  so that a host application can override most of them from
+  `config/runtime.exs`. Two are read while resources compile and therefore
+  belong in `config/config.exs`: `prefix`, which a verifier requires, and
+  `poller`, which decides whether `AshMetrics.Poller.AshOban.Transformer`
+  generates Oban schedules for a resource. A `poller` that differs between
+  compile time and runtime leaves gauges with no poller at all.
   """
 
   @app :ash_metrics

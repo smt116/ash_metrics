@@ -177,12 +177,17 @@ queue entry, so its duration and failure rate are things Oban already
 measures.
 
 ```elixir
+# In config/config.exs: the choice is read while resources compile.
 config :ash_metrics, poller: AshMetrics.Poller.AshOban
 
 config :ash_metrics, AshMetrics.Poller.AshOban,
   queue: :default,
   max_attempts: 1
 ```
+
+Like `prefix`, the poller has to be compile-time configuration: the schedules
+are generated while the resource compiles, and a poller that differs between
+compile time and runtime leaves the gauges with no poller at all.
 
 `max_attempts` defaults to one on purpose. A gauge answers a question about
 the present, so retrying a poll that failed three minutes ago answers a
