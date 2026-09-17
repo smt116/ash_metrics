@@ -20,6 +20,18 @@ if Code.ensure_loaded?(Igniter) do
     prints those rather than writing them out, so that a configuration file
     only ever holds what the application actually decided.
 
+    It then wires the metrics up:
+
+    * The module that imports `Telemetry.Metrics` and defines `metrics/0` —
+      `MyAppWeb.Telemetry` in a generated Phoenix application — has
+      `++ AshMetrics.metrics()` appended to what that function returns, so
+      that the reporter it already starts ships the declared metrics too.
+      When there is no such module, the snippet to add is printed instead.
+    * `AshMetrics.Supervisor` is added to the application's children, after
+      the repositories and Oban, because a gauge is answered by a query.
+
+    Both are idempotent, so the task is safe to run again.
+
         mix igniter.install ash_metrics
     """
 
@@ -27,9 +39,14 @@ if Code.ensure_loaded?(Igniter) do
 
     # Aliased under a prefix, because `Igniter.Project.Application` would
     # otherwise shadow Elixir's own `Application`.
+    alias Igniter.Code.Common
+    alias Igniter.Code.Function
+    alias Igniter.Libs.Ecto, as: EctoLib
     alias Igniter.Project.Application, as: ProjectApplication
     alias Igniter.Project.Config, as: ProjectConfig
     alias Igniter.Project.Formatter, as: ProjectFormatter
+    alias Igniter.Project.Module, as: ProjectModule
+    alias Sourceror.Zipper
 
     @example "mix igniter.install ash_metrics"
 
@@ -57,6 +74,21 @@ if Code.ensure_loaded?(Igniter) do
     strategy and declare gauges.
     """
 
+    # Printed when nothing in the application looks like the module a
+    # reporter is configured from, which is the case for an application that
+    # runs no reporter yet.
+    @no_telemetry_module """
+    No module that imports `Telemetry.Metrics` and defines `metrics/0` was
+    found, so nothing reports the declared metrics yet. Start a reporter with
+    them:
+
+        {Telemetry.Metrics.ConsoleReporter, metrics: AshMetrics.metrics()}
+
+    If you do already run a reporter, splice `AshMetrics.metrics/0` into the
+    list of metrics it is given, rather than starting a second one:
+    `my_own_metrics() ++ AshMetrics.metrics()`.
+    """
+
     @impl Igniter.Mix.Task
     def info(_argv, _source) do
       %Igniter.Mix.Task.Info{
@@ -74,6 +106,8 @@ if Code.ensure_loaded?(Igniter) do
       igniter
       |> ProjectFormatter.import_dep(:ash_metrics)
       |> configure(app_name)
+      |> add_to_reporter()
+      |> supervise()
       |> Igniter.add_notice(@optional_keys)
     end
 
@@ -84,6 +118,91 @@ if Code.ensure_loaded?(Igniter) do
       igniter
       |> ProjectConfig.configure_new("config.exs", :ash_metrics, [:prefix], to_string(app_name))
       |> ProjectConfig.configure_new("config.exs", :ash_metrics, [:otp_app], app_name)
+    end
+
+    @spec add_to_reporter(Igniter.t()) :: Igniter.t()
+    defp add_to_reporter(igniter) do
+      case ProjectModule.find_all_matching_modules(igniter, &telemetry_module?(&1, &2)) do
+        {igniter, []} -> Igniter.add_notice(igniter, @no_telemetry_module)
+        {igniter, modules} -> Enum.reduce(modules, igniter, &append_metrics(&2, &1))
+      end
+    end
+
+    # A module that both imports `Telemetry.Metrics` and defines `metrics/0`
+    # is where a reporter is told what to report. Phoenix generates exactly
+    # one, `MyAppWeb.Telemetry`; every match is updated, since an umbrella or
+    # a hand-written tree may have more.
+    @spec telemetry_module?(module(), Zipper.t()) :: boolean()
+    defp telemetry_module?(_module, zipper) do
+      imports_telemetry_metrics?(zipper) and match?({:ok, _zipper}, metrics_body(zipper))
+    end
+
+    @spec imports_telemetry_metrics?(Zipper.t()) :: boolean()
+    defp imports_telemetry_metrics?(zipper) do
+      Enum.any?([:import, :use], fn call ->
+        match?(
+          {:ok, _zipper},
+          Function.move_to_function_call(zipper, call, [1, 2], fn zipper ->
+            Function.argument_equals?(zipper, 0, Telemetry.Metrics)
+          end)
+        )
+      end)
+    end
+
+    @spec metrics_body(Zipper.t()) :: {:ok, Zipper.t()} | :error
+    defp metrics_body(zipper), do: Function.move_to_def(zipper, :metrics, 0)
+
+    @spec append_metrics(Igniter.t(), module()) :: Igniter.t()
+    defp append_metrics(igniter, module) do
+      # The module was found by `find_all_matching_modules/2` a moment ago, so
+      # `find_and_update_module/3` cannot fail to find it again.
+      {:ok, igniter} = ProjectModule.find_and_update_module(igniter, module, &append_to_body/1)
+
+      igniter
+    end
+
+    @spec append_to_body(Zipper.t()) :: {:ok, Zipper.t()} | :error
+    defp append_to_body(zipper) do
+      with {:ok, zipper} <- metrics_body(zipper) do
+        if already_appended?(zipper), do: {:ok, zipper}, else: {:ok, append_call(zipper)}
+      end
+    end
+
+    @spec already_appended?(Zipper.t()) :: boolean()
+    defp already_appended?(zipper) do
+      match?({:ok, _zipper}, Function.move_to_function_call(zipper, {AshMetrics, :metrics}, 0))
+    end
+
+    # The value of `metrics/0` is whatever its last expression evaluates to,
+    # which is the list a reporter is handed. Appending to that expression
+    # rather than rewriting the function leaves an application's own metrics,
+    # and whatever it computes them from, untouched.
+    @spec append_call(Zipper.t()) :: Zipper.t()
+    defp append_call(zipper) do
+      zipper = last_expression(zipper)
+
+      Zipper.replace(
+        zipper,
+        {:++, [], [Zipper.node(zipper), Sourceror.parse_string!("AshMetrics.metrics()")]}
+      )
+    end
+
+    @spec last_expression(Zipper.t()) :: Zipper.t()
+    defp last_expression(zipper) do
+      case Zipper.node(zipper) do
+        {:__block__, _meta, [_first, _second | _rest]} ->
+          zipper |> Zipper.down() |> Zipper.rightmost()
+
+        _node ->
+          Common.maybe_move_to_single_child_block(zipper)
+      end
+    end
+
+    @spec supervise(Igniter.t()) :: Igniter.t()
+    defp supervise(igniter) do
+      {igniter, repos} = EctoLib.list_repos(igniter)
+
+      ProjectApplication.add_new_child(igniter, AshMetrics.Supervisor, after: repos ++ [Oban])
     end
   end
 else
