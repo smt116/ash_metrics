@@ -41,6 +41,9 @@ becomes known:
       metadata: changeset.context
     )
 
+When the fact is written by an Ash action, `increment_on_change/2` and
+`observe_elapsed/2` declare a `change` that emits it from that action.
+
 A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
 `period` and emits one value per group.
 

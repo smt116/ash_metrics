@@ -122,8 +122,19 @@ metric name rather than one name per value. An entry written `key` is open, and
 a call site may pass any value or none at all. A distribution's value is
 measured by the call site, not by the package.
 
-Emit them where the outcome becomes known, not from the action lifecycle: an
-action returning `{:ok, _}` does not mean the email was delivered.
+The declarations themselves are checked while the resource compiles: metric
+names must be unique, tag keys must be unique and must not collide with the
+keys the tag extractor adds, a closed tag needs at least one value and no
+duplicates, and buckets must be strictly ascending positive numbers. Spark
+reports a failed check as a compiler warning pointing at the offending
+declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
+declaration should fail the build.
+
+See the [DSL reference](documentation/dsls/DSL-AshMetrics.md) for every option.
+
+Emit them where the outcome becomes known: an action returning `{:ok, _}` does
+not mean the email was delivered, so nothing is emitted from the action
+lifecycle unless the action says so.
 
 ```elixir
 AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
@@ -145,15 +156,41 @@ refuses to stringify a struct into a tag value.
 A missing closed tag, a value that tag does not declare, or a tag key that was
 not declared at all raises rather than emitting.
 
-The declarations themselves are checked while the resource compiles: metric
-names must be unique, tag keys must be unique and must not collide with the
-keys the tag extractor adds, a closed tag needs at least one value and no
-duplicates, and buckets must be strictly ascending positive numbers. Spark
-reports a failed check as a compiler warning pointing at the offending
-declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
-declaration should fail the build.
+### Emitting from actions
 
-See the [DSL reference](documentation/dsls/DSL-AshMetrics.md) for every option.
+When the fact is written by an Ash action, that action can emit it:
+
+```elixir
+update :update_status do
+  accept [:status, :delivered_at]
+  require_atomic? false
+
+  change AshMetrics.increment_on_change(:delivery, :status)
+
+  change AshMetrics.observe_elapsed(:delivery_time,
+           from: :inserted_at,
+           to: :delivered_at
+         ),
+         where: [attribute_equals(:status, :delivered)]
+end
+```
+
+`increment_on_change/2` counts one `delivery` after the transaction whenever
+the action leaves `status` holding a value the record did not have before,
+tagged with that value and with every other declared tag of the counter that
+names an attribute of the record. `observe_elapsed/2` records the time
+between two timestamps of the written record into `delivery_time`, in that
+distribution's unit; `where:` narrows it to the one transition that means
+delivered. Both take their extractor metadata from the changeset, emit
+nothing when the action fails, and never alter its result. See
+`AshMetrics.Changes.IncrementOnChange` and `AshMetrics.Changes.ObserveElapsed`.
+
+Two caveats. A value outside a closed tag's declared set is skipped, so a
+status the counter does not enumerate is not counted and nothing is raised.
+And both changes refuse to run atomically: the action needs `require_atomic?
+false`, and `Ash.bulk_update/4` needs `:stream` among its strategies, or it
+emits nothing and returns `Ash.Error.Invalid.NoMatchingBulkStrategy`.
+`Ash.bulk_create/4` needs nothing extra.
 
 ### Gauges
 

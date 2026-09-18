@@ -60,8 +60,9 @@ These are decisions already made. Do not relitigate them in code.
 - **Optional dependencies stay optional.** Guard any module backed by an
   optional dep with `Code.ensure_loaded?/1`, and raise a clear compile error if
   a selected backend or poller's dependency is missing.
-- **Counters are manual by design.** Never auto-emit counters from the Ash
-  action lifecycle. An action returning `{:ok, _}` means the function returned
+- **Counters are emitted where the fact is written.** By hand, or by
+  `increment_on_change` on the action that writes it; never inferred from an
+  action succeeding. An action returning `{:ok, _}` means the function returned
   an ok tuple, not that the business outcome happened; outcomes often land in a
   notifier or webhook long afterwards.
 - **An enumerated dimension is a tag, not a name segment.** A counter broken

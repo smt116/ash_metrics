@@ -18,6 +18,11 @@ and this project adheres to
 - An emission API, `AshMetrics.increment/3` and `AshMetrics.observe/4`, which
   validates the metric, the tag keys and the values of the closed tags at the
   call site.
+- `AshMetrics.increment_on_change/2` and `AshMetrics.observe_elapsed/2`, two
+  `Ash.Resource.Change` builders that emit a counter or a distribution from
+  the action that writes the fact, after the transaction and only when it
+  succeeded. Neither runs atomically, so the action needs
+  `require_atomic? false`.
 - Configurable metric naming, tag extraction, gauge computation and reporter
   wiring, through the `AshMetrics.NameBuilder`, `AshMetrics.TagExtractor`,
   `AshMetrics.Gauge.Strategy` and `AshMetrics.Backend` behaviours, each with a
