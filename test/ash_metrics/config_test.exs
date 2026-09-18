@@ -12,7 +12,6 @@ defmodule AshMetrics.ConfigTest do
         [
           :prefix,
           :otp_app,
-          :outcome_tag,
           :name_builder,
           :tag_extractor,
           :backend,
@@ -135,10 +134,6 @@ defmodule AshMetrics.ConfigTest do
   end
 
   describe "defaults" do
-    test "outcome_tag/0 defaults to :outcome" do
-      assert Config.outcome_tag() == :outcome
-    end
-
     test "name_builder/0 defaults to the bundled builder" do
       assert Config.name_builder() == AshMetrics.NameBuilder.Default
     end
@@ -157,12 +152,6 @@ defmodule AshMetrics.ConfigTest do
   end
 
   describe "overrides" do
-    test "outcome_tag/0 can be overridden" do
-      Application.put_env(:ash_metrics, :outcome_tag, :result)
-
-      assert Config.outcome_tag() == :result
-    end
-
     test "name_builder/0 can be overridden" do
       Application.put_env(:ash_metrics, :name_builder, MyApp.NameBuilder)
 

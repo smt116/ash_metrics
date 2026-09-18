@@ -7,10 +7,10 @@ defmodule AshMetrics.AssertionsSubsetTest do
   alias AshMetrics.Test.Invoice
 
   test "attaches only to the metrics of the given resources" do
-    AshMetrics.increment(Invoice, :capture, outcome: :succeeded)
-    AshMetrics.increment(Delivery, :delivery, outcome: :sent)
+    AshMetrics.increment(Invoice, :capture)
+    AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent})
 
-    assert_metric_emitted("test.mailings.invoice.capture", outcome: :succeeded)
+    assert_metric_emitted("test.mailings.invoice.capture")
     refute_metric_emitted("test.mailings.templated_delivery.delivery")
   end
 end

@@ -20,8 +20,6 @@ defmodule AshMetrics.Dsl do
     every emission must carry it, with one of them, and one metric name carries
     the whole enumeration. An entry written `key` is open, and a call site may
     pass any value or none at all.
-
-    `outcomes` declares the same thing for the configured outcome tag.
     """,
     examples: [
       "counter :delivery, tags: [status: [:sent, :bounced, :error]]",
@@ -34,18 +32,12 @@ defmodule AshMetrics.Dsl do
     ],
     target: AshMetrics.Dsl.Counter,
     args: [:name],
-    transform: {AshMetrics.Dsl.Counter, :transform, []},
+    transform: {AshMetrics.Dsl.Tags, :transform, []},
     schema: [
       name: [
         type: :atom,
         required: true,
         doc: "The name of the counter, used as the last segment of the metric name."
-      ],
-      outcomes: [
-        type: {:list, :atom},
-        required: false,
-        doc:
-          "The permitted values of the outcome tag. Equivalent to a closed entry for that tag in `tags`."
       ],
       tags: [
         type: @tags_type,

@@ -9,9 +9,8 @@ defmodule AshMetrics.Test.Delivery do
     name :templated_delivery
 
     counter :delivery,
-      outcomes: [:queued, :sent, :bounced, :delivered, :error],
-      tags: [:provider, :template],
-      description: "Templated deliveries by outcome"
+      tags: [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]],
+      description: "Templated deliveries by status"
 
     distribution :send_latency,
       unit: {:native, :millisecond},

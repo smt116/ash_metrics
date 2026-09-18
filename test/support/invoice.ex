@@ -6,7 +6,7 @@ defmodule AshMetrics.Test.Invoice do
     extensions: [AshMetrics]
 
   metrics do
-    counter :capture, outcomes: [:succeeded, :failed]
+    counter :capture
     distribution :settlement_lag
   end
 

@@ -20,8 +20,7 @@ ships them to a backend.
         name :templated_delivery
 
         counter :delivery,
-          outcomes: [:queued, :sent, :bounced, :delivered, :error],
-          tags: [:provider, :template]
+          tags: [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]]
 
         gauge :backlog,
           filter: expr(status in [:pending, :processing]),
@@ -33,8 +32,7 @@ Counters and distributions are emitted by hand, at the moment the outcome
 becomes known:
 
     AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
-      outcome: :sent,
-      tags: %{provider: "ses", template: "welcome_v2"},
+      tags: %{status: :sent, provider: "ses", template: "welcome_v2"},
       metadata: changeset.context
     )
 
@@ -124,8 +122,6 @@ every emission must carry it, with one of them, and one metric name carries
 the whole enumeration. An entry written `key` is open, and a call site may
 pass any value or none at all.
 
-`outcomes` declares the same thing for the configured outcome tag.
-
 
 
 
@@ -153,7 +149,6 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`outcomes`](#metrics-counter-outcomes){: #metrics-counter-outcomes } | `list(atom)` |  | The permitted values of the outcome tag. Equivalent to a closed entry for that tag in `tags`. |
 | [`tags`](#metrics-counter-tags){: #metrics-counter-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this counter accepts at the call site. An entry with a list of values closes the tag to them and requires it on every emission. |
 | [`description`](#metrics-counter-description){: #metrics-counter-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 

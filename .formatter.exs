@@ -14,7 +14,6 @@ spark_locals_without_parens = [
   gauge: 2,
   group_by: 1,
   name: 1,
-  outcomes: 1,
   period: 1,
   poller: 1,
   strategy: 1,

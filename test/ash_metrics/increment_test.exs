@@ -64,72 +64,73 @@ defmodule AshMetrics.IncrementTest do
   end
 
   describe "increment/3" do
-    test "emits the event name, a count of one, and the outcome tag" do
-      assert AshMetrics.increment(Delivery, :delivery, outcome: :sent) == :ok
+    test "emits the event name, a count of one, and the call-site tags" do
+      assert AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent}) == :ok
 
       assert_received {:emitted, event, measurements, metadata}
       assert event == [:ash_metrics, AshMetrics.Test.Delivery, :delivery]
       assert measurements == %{count: 1}
-      assert metadata == %{outcome: :sent}
+      assert metadata == %{status: :sent}
     end
 
     test "carries declared call-site tags" do
       AshMetrics.increment(Delivery, :delivery,
-        outcome: :bounced,
-        tags: %{provider: "ses", template: "welcome_v2"}
+        tags: %{status: :bounced, provider: "ses", template: "welcome_v2"}
       )
 
       assert_received {:emitted, _event, _measurements, metadata}
 
-      assert metadata == %{outcome: :bounced, provider: "ses", template: "welcome_v2"}
+      assert metadata == %{status: :bounced, provider: "ses", template: "welcome_v2"}
     end
 
     test "carries tags the extractor derives from metadata" do
-      AshMetrics.increment(Delivery, :delivery, outcome: :sent, metadata: %{tenant: "acme"})
+      AshMetrics.increment(Delivery, :delivery,
+        tags: %{status: :sent},
+        metadata: %{tenant: "acme"}
+      )
 
       assert_received {:emitted, _event, _measurements, metadata}
 
-      assert metadata == %{outcome: :sent, tenant: "acme"}
+      assert metadata == %{status: :sent, tenant: "acme"}
     end
 
     test "drops an unusable tenant rather than tagging with it" do
       AshMetrics.increment(Delivery, :delivery,
-        outcome: :sent,
+        tags: %{status: :sent},
         metadata: %{tenant: %URI{host: "acme.test"}}
       )
 
       assert_received {:emitted, _event, _measurements, metadata}
 
-      assert metadata == %{outcome: :sent}
+      assert metadata == %{status: :sent}
     end
 
     test "call-site tags win over extracted ones" do
       Application.put_env(:ash_metrics, :tag_extractor, ProviderFromMetadata)
 
       AshMetrics.increment(Delivery, :delivery,
-        outcome: :sent,
-        tags: %{provider: "explicit"},
+        tags: %{status: :sent, provider: "explicit"},
         metadata: %{provider: "extracted"}
       )
 
       assert_received {:emitted, _event, _measurements, metadata}
 
-      assert metadata == %{outcome: :sent, provider: "explicit"}
+      assert metadata == %{status: :sent, provider: "explicit"}
     end
 
     test "works for a counter that declares no tags" do
-      assert AshMetrics.increment(Invoice, :capture, outcome: :succeeded) == :ok
+      assert AshMetrics.increment(Invoice, :capture) == :ok
 
       assert_received {:emitted, event, measurements, metadata}
       assert event == [:ash_metrics, AshMetrics.Test.Invoice, :capture]
       assert measurements == %{count: 1}
-      assert metadata == %{outcome: :succeeded}
+      assert metadata == %{}
     end
 
     test "raises when the metric is a distribution" do
       error =
         assert_raise ArgumentError, fn ->
-          AshMetrics.increment(Delivery, :send_latency, outcome: :sent)
+          AshMetrics.increment(Delivery, :send_latency)
         end
 
       assert error.message ==
@@ -140,7 +141,7 @@ defmodule AshMetrics.IncrementTest do
     test "raises when the metric is a gauge" do
       error =
         assert_raise ArgumentError, fn ->
-          AshMetrics.increment(Job, :backlog, outcome: :sent)
+          AshMetrics.increment(Job, :backlog)
         end
 
       assert error.message ==
@@ -150,58 +151,39 @@ defmodule AshMetrics.IncrementTest do
 
     test "raises when the metric is not declared" do
       assert_raise ArgumentError, ~r/no metric :nope is declared/, fn ->
-        AshMetrics.increment(Delivery, :nope, outcome: :sent)
+        AshMetrics.increment(Delivery, :nope)
       end
     end
 
     test "raises when the resource does not use the extension" do
       assert_raise ArgumentError, ~r/Declared metrics: none/, fn ->
-        AshMetrics.increment(Plain, :delivery, outcome: :sent)
+        AshMetrics.increment(Plain, :delivery)
       end
-    end
-
-    test "raises when a closed tag is missing, naming it and its declared values" do
-      error = assert_raise ArgumentError, fn -> AshMetrics.increment(Invoice, :capture, []) end
-
-      assert error.message ==
-               ":outcome is a required tag of counter :capture on " <>
-                 "AshMetrics.Test.Invoice. Declared values: :succeeded, :failed"
-    end
-
-    test "raises when a closed tag's value is not declared, listing the declared values" do
-      error =
-        assert_raise ArgumentError, fn ->
-          AshMetrics.increment(Invoice, :capture, outcome: :sent)
-        end
-
-      assert error.message ==
-               ":sent is not a declared value of the tag :outcome of counter :capture " <>
-                 "on AshMetrics.Test.Invoice. Declared values: :succeeded, :failed"
     end
 
     test "raises when a tag is not declared, naming it and the declared tags" do
       error =
         assert_raise ArgumentError, fn ->
-          AshMetrics.increment(Delivery, :delivery, outcome: :sent, tags: %{region: "eu"})
+          AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent, region: "eu"})
         end
 
       assert error.message ==
                ":region is not a declared tag of counter :delivery on " <>
-                 "AshMetrics.Test.Delivery. Declared tags: :outcome, :provider, :template"
+                 "AshMetrics.Test.Delivery. Declared tags: :provider, :template, :status"
     end
 
-    test "raises for any tag beyond the declared ones" do
+    test "raises for any tag when the counter declares none" do
       error =
         assert_raise ArgumentError, fn ->
-          AshMetrics.increment(Invoice, :capture, outcome: :failed, tags: %{provider: "ses"})
+          AshMetrics.increment(Invoice, :capture, tags: %{provider: "ses"})
         end
 
-      assert error.message =~ "Declared tags: :outcome"
+      assert error.message =~ "Declared tags: none"
     end
 
     test "emits nothing when validation fails" do
       assert_raise ArgumentError, fn ->
-        AshMetrics.increment(Delivery, :delivery, outcome: :nope)
+        AshMetrics.increment(Delivery, :delivery, tags: %{status: :nope})
       end
 
       refute_received {:emitted, _event, _measurements, _metadata}

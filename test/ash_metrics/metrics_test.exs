@@ -52,8 +52,8 @@ defmodule AshMetrics.MetricsTest do
       assert counter.name == [:test, :mailings, :templated_delivery, :delivery, :count]
       assert counter.event_name == [:ash_metrics, Delivery, :delivery]
       assert counter.measurement == :count
-      assert counter.tags == [:outcome, :provider, :template, :tenant]
-      assert counter.description == "Templated deliveries by outcome"
+      assert counter.tags == [:provider, :template, :status, :tenant]
+      assert counter.description == "Templated deliveries by status"
       assert counter.unit == :unit
       assert counter.reporter_options == []
     end
@@ -96,9 +96,8 @@ defmodule AshMetrics.MetricsTest do
       assert distribution.reporter_options == []
     end
 
-    test "tags a counter with no declared tags with the outcome and extractor keys only" do
-      assert [%Counter{tags: [:outcome, :tenant]}, %Distribution{}] =
-               AshMetrics.metrics_for([Invoice])
+    test "tags a counter with no declared tags with the extractor keys only" do
+      assert [%Counter{tags: [:tenant]}, %Distribution{}] = AshMetrics.metrics_for([Invoice])
     end
 
     test "tags a metric with every declared key, closed or open, plus the extractor keys" do

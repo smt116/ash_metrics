@@ -50,7 +50,7 @@ defmodule AshMetrics.Verifiers.VerifyPrefixTest do
   defp counter do
     quote do
       metrics do
-        counter :delivery, outcomes: [:sent]
+        counter :delivery, tags: [status: [:sent]]
       end
     end
   end

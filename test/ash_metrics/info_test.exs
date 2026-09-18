@@ -18,9 +18,9 @@ defmodule AshMetrics.InfoTest do
       assert [%Counter{} = counter, %Distribution{} = distribution] = Info.metrics(Delivery)
 
       assert counter.name == :delivery
-      assert counter.tags == [:outcome, :provider, :template]
-      assert counter.tag_values == %{outcome: [:queued, :sent, :bounced, :delivered, :error]}
-      assert counter.description == "Templated deliveries by outcome"
+      assert counter.tags == [:provider, :template, :status]
+      assert counter.tag_values == %{status: [:queued, :sent, :bounced, :delivered, :error]}
+      assert counter.description == "Templated deliveries by status"
 
       assert distribution.name == :send_latency
       assert distribution.unit == {:native, :millisecond}
@@ -46,7 +46,7 @@ defmodule AshMetrics.InfoTest do
 
     test "defaults tags to an empty list and description to nil" do
       assert [
-               %Counter{name: :capture, tags: [:outcome], description: nil},
+               %Counter{name: :capture, tags: [], tag_values: %{}, description: nil},
                %Distribution{
                  name: :settlement_lag,
                  unit: :unit,

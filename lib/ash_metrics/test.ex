@@ -15,8 +15,7 @@ defmodule AshMetrics.Test do
           MyApp.Mailings.deliver!(...)
 
           assert_metric_emitted "myapp.mailings.templated_delivery.delivery",
-            outcome: :sent,
-            tags: %{provider: "ses"}
+            tags: %{status: :sent, provider: "ses"}
         end
       end
 
@@ -39,8 +38,6 @@ defmodule AshMetrics.Test do
   calls in every test file, and that is enough friction to stop people
   asserting on their metrics at all.
   """
-
-  alias AshMetrics.Config
 
   @assert_timeout 100
   @refute_timeout 10
@@ -87,7 +84,6 @@ defmodule AshMetrics.Test do
 
   ## Options
 
-  * `:outcome` — the expected value of the outcome tag.
   * `:tags` — tags that must be present. Matched as a subset, so a metric
     carrying tags this assertion says nothing about still matches.
   * `:value` — the expected observed value of a distribution.
@@ -163,16 +159,7 @@ defmodule AshMetrics.Test do
 
   @spec matches?(keyword(), map(), map()) :: boolean()
   defp matches?(opts, measurements, tags) do
-    matches_outcome?(opts, tags) and matches_tags?(opts, tags) and
-      matches_value?(opts, measurements)
-  end
-
-  @spec matches_outcome?(keyword(), map()) :: boolean()
-  defp matches_outcome?(opts, tags) do
-    case Keyword.fetch(opts, :outcome) do
-      {:ok, outcome} -> Map.get(tags, Config.outcome_tag()) == outcome
-      :error -> true
-    end
+    matches_tags?(opts, tags) and matches_value?(opts, measurements)
   end
 
   @spec matches_tags?(keyword(), map()) :: boolean()
@@ -211,7 +198,7 @@ defmodule AshMetrics.Test do
 
   @spec expectations(keyword()) :: String.t()
   defp expectations(opts) do
-    case Keyword.take(opts, [:outcome, :tags, :value]) do
+    case Keyword.take(opts, [:tags, :value]) do
       [] -> ""
       expected -> " with " <> Enum.map_join(expected, ", ", fn {k, v} -> "#{k} #{inspect(v)}" end)
     end

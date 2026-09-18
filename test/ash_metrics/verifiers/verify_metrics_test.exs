@@ -11,7 +11,7 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert [%DslError{path: [:metrics, :delivery]} = error] =
              errors(
                quote do
-                 counter :delivery, outcomes: [:sent]
+                 counter :delivery, tags: [status: [:sent]]
                  distribution :delivery
                end
              )
@@ -44,12 +44,6 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
              "distribution :send_latency declares no values for the tag :provider"
   end
 
-  test "an outcomes declaration is checked as the values of the outcome tag" do
-    assert [%DslError{} = error] = errors(quote(do: counter(:delivery, outcomes: [])))
-
-    assert Exception.message(error) =~ "counter :delivery declares no values for the tag :outcome"
-  end
-
   test "a counter may not declare a tag key twice across the two forms" do
     assert [%DslError{} = error] =
              errors(quote(do: counter(:delivery, tags: [:status, status: [:sent]])))
@@ -60,9 +54,7 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
 
   test "a counter may not declare the same tag twice" do
     assert [%DslError{} = error] =
-             errors(
-               quote(do: counter(:delivery, outcomes: [:sent], tags: [:provider, :provider]))
-             )
+             errors(quote(do: counter(:delivery, tags: [:provider, :provider])))
 
     assert Exception.message(error) =~
              "counter :delivery declares the tag :provider more than once"
@@ -74,14 +66,6 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
 
     assert Exception.message(error) =~
              "distribution :send_latency declares the tag :provider more than once"
-  end
-
-  test "an outcomes declaration collides with an explicit tag for the outcome key" do
-    assert [%DslError{} = error] =
-             errors(quote(do: counter(:delivery, outcomes: [:sent], tags: [:outcome])))
-
-    assert Exception.message(error) =~
-             "counter :delivery declares the tag :outcome more than once"
   end
 
   test "a tag the extractor supplies is reserved" do
@@ -128,7 +112,7 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert [%DslError{path: [:metrics, :backlog]} = error] =
              errors(
                quote do
-                 counter :backlog, outcomes: [:sent]
+                 counter :backlog, tags: [status: [:sent]]
                  gauge :backlog
                end
              )
@@ -176,19 +160,18 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   test "a valid declaration produces no errors" do
     assert errors(
              quote do
-               counter :delivery, outcomes: [:sent, :error], tags: [:provider]
-               distribution :send_latency, unit: {:native, :millisecond}, buckets: [10, 50.5, 100]
+               counter :delivery, tags: [:provider, status: [:sent, :error]]
+
+               distribution :send_latency,
+                 unit: {:native, :millisecond},
+                 buckets: [10, 50.5, 100],
+                 tags: [{:provider, [:ses]}, :template]
              end
            ) == []
   end
 
-  test "a valid declaration with closed tags produces no errors" do
-    assert errors(
-             quote do
-               counter :delivery, tags: [:provider, status: [:sent, :error]]
-               distribution :send_latency, tags: [{:provider, [:ses]}, :template]
-             end
-           ) == []
+  test "a counter with no tags at all is valid" do
+    assert errors(quote(do: counter(:delivery))) == []
   end
 
   test "the support resources declare valid metrics" do

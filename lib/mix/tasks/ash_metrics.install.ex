@@ -54,7 +54,6 @@ if Code.ensure_loaded?(Igniter) do
     Everything else AshMetrics reads has a default. These are they:
 
         config :ash_metrics,
-          outcome_tag: :outcome,
           name_builder: AshMetrics.NameBuilder.Default,
           tag_extractor: AshMetrics.TagExtractor.Default,
           backend: AshMetrics.Backend.Noop,

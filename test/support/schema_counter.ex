@@ -10,7 +10,7 @@ defmodule AshMetrics.Test.SchemaCounter do
     extensions: [AshMetrics]
 
   metrics do
-    counter :capture, outcomes: [:succeeded, :failed]
+    counter :capture, tags: [status: [:succeeded, :failed]]
   end
 
   multitenancy do

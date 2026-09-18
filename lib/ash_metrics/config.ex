@@ -8,7 +8,6 @@ defmodule AshMetrics.Config do
       config :ash_metrics,
         prefix: "myapp",
         otp_app: :my_app,
-        outcome_tag: :outcome,
         name_builder: AshMetrics.NameBuilder.Default,
         tag_extractor: AshMetrics.TagExtractor.Default,
         backend: AshMetrics.Backend.Noop,
@@ -82,12 +81,6 @@ defmodule AshMetrics.Config do
         """
     end
   end
-
-  @doc """
-  The tag key that carries a counter's outcome. Defaults to `:outcome`.
-  """
-  @spec outcome_tag() :: atom()
-  def outcome_tag, do: Application.get_env(@app, :outcome_tag, :outcome)
 
   @doc """
   The `AshMetrics.NameBuilder` implementation used to build metric names.

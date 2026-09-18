@@ -17,8 +17,7 @@ defmodule AshMetrics do
           name :templated_delivery
 
           counter :delivery,
-            outcomes: [:queued, :sent, :bounced, :delivered, :error],
-            tags: [:provider, :template]
+            tags: [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]]
 
           gauge :backlog,
             filter: expr(status in [:pending, :processing]),
@@ -30,8 +29,7 @@ defmodule AshMetrics do
   becomes known:
 
       AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
-        outcome: :sent,
-        tags: %{provider: "ses", template: "welcome_v2"},
+        tags: %{status: :sent, provider: "ses", template: "welcome_v2"},
         metadata: changeset.context
       )
 
@@ -108,8 +106,6 @@ defmodule AshMetrics do
   ## Options
 
   * `:tags` — a map of call-site tags, defaulting to `%{}`.
-  * `:outcome` — the value of the configured outcome tag, if the counter
-    declares `outcomes`.
   * `:metadata` — a map passed to the configured `AshMetrics.TagExtractor`,
     defaulting to `%{}`. Anything shaped like Ash event metadata will do; a
     changeset's context is the usual thing to pass.
@@ -125,29 +121,14 @@ defmodule AshMetrics do
       )
   """
   @spec increment(module(), atom(), keyword()) :: :ok
-  def increment(resource, metric, opts) do
+  def increment(resource, metric, opts \\ []) do
     counter = counter!(resource, metric)
-    tags = tags(resource, counter, with_outcome(opts))
 
-    :telemetry.execute(event_name(resource, metric), %{count: 1}, tags)
-  end
-
-  @spec with_outcome(keyword()) :: keyword()
-  defp with_outcome(opts) do
-    case Keyword.fetch(opts, :outcome) do
-      {:ok, outcome} ->
-        outcome_tag = Config.outcome_tag()
-
-        Keyword.update(
-          opts,
-          :tags,
-          %{outcome_tag => outcome},
-          &Map.put(&1, outcome_tag, outcome)
-        )
-
-      :error ->
-        opts
-    end
+    :telemetry.execute(
+      event_name(resource, metric),
+      %{count: 1},
+      tags(resource, counter, opts)
+    )
   end
 
   @spec counter!(module(), atom()) :: Counter.t()

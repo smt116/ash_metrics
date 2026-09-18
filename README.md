@@ -57,7 +57,6 @@ Configuration:
 config :ash_metrics,
   prefix: "myapp",                                  # REQUIRED
   otp_app: :my_app,                                 # REQUIRED
-  outcome_tag: :outcome,
   name_builder: AshMetrics.NameBuilder.Default,
   tag_extractor: AshMetrics.TagExtractor.Default,
   backend: AshMetrics.Backend.Noop,
