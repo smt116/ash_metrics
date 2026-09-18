@@ -2,13 +2,17 @@ defmodule AshMetrics.MixProject do
   use Mix.Project
 
   @description "Declarative business metrics DSL for Ash resources, compiled to Telemetry.Metrics definitions."
+  @version "0.1.0"
+  @source_url "https://github.com/smt116/ash_metrics"
 
   def project do
     [
       app: :ash_metrics,
-      version: "0.1.0",
+      version: @version,
       description: @description,
       name: "AshMetrics",
+      source_url: @source_url,
+      homepage_url: @source_url,
       elixir: "~> 1.17",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -39,9 +43,11 @@ defmodule AshMetrics.MixProject do
   defp package do
     [
       licenses: ["MIT"],
-      # Hex requires the `links` key. Left empty until the repository URL is
-      # decided.
-      links: %{},
+      maintainers: ["Maciej Malecki"],
+      links: %{
+        "GitHub" => @source_url,
+        "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
+      },
       files: ~w(lib documentation .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
@@ -49,6 +55,8 @@ defmodule AshMetrics.MixProject do
   defp docs do
     [
       main: "readme",
+      source_url: @source_url,
+      source_ref: "v#{@version}",
       extras: [
         "README.md",
         "documentation/dsls/DSL-AshMetrics.md",
