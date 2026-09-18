@@ -196,7 +196,9 @@ defmodule AshMetrics.MetricsTest do
                [:test, :queue, :ticket, :time_to_resolve, :duration],
                [:test, :pg, :pg_job, :backlog, :gauge],
                [:test, :pg, :pg_job, :total, :gauge],
-               [:test, :pg, :pg_oban_job, :backlog, :gauge]
+               [:test, :pg, :pg_oban_job, :backlog, :gauge],
+               [:test, :pg, :pg_ticket, :transitions, :count],
+               [:test, :pg, :pg_ticket, :time_to_resolve, :duration]
              ]
     end
 
