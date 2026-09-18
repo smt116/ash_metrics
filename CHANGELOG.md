@@ -13,9 +13,11 @@ and this project adheres to
 - A `metrics do` block on an Ash resource, declaring `counter`, `gauge` and
   `distribution` metrics that compile to `Telemetry.Metrics` definitions for
   the host application's own reporter. The declarations are verified while the
-  resource compiles.
+  resource compiles. A counter's or a distribution's tag is either open or
+  closed to an enumerated set of values.
 - An emission API, `AshMetrics.increment/3` and `AshMetrics.observe/4`, which
-  validates the metric, outcome and tag keys at the call site.
+  validates the metric, the tag keys and the values of the closed tags at the
+  call site.
 - Configurable metric naming, tag extraction, gauge computation and reporter
   wiring, through the `AshMetrics.NameBuilder`, `AshMetrics.TagExtractor`,
   `AshMetrics.Gauge.Strategy` and `AshMetrics.Backend` behaviours, each with a

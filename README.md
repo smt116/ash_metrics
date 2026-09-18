@@ -93,11 +93,10 @@ defmodule MyApp.Mailings.TemplatedDelivery do
     name :templated_delivery
 
     # → myapp.mailings.templated_delivery.delivery.count
-    #   tags: outcome, provider, template, tenant
+    #   tags: provider, template, status, tenant
     counter :delivery,
-      outcomes: [:queued, :sent, :bounced, :delivered, :error],
-      tags: [:provider, :template],
-      description: "Templated deliveries by outcome"
+      tags: [:provider, :template, status: [:queued, :sent, :bounced, :delivered, :error]],
+      description: "Templated deliveries by status"
 
     # → myapp.mailings.templated_delivery.backlog.gauge
     #   tags: status, provider
@@ -112,23 +111,28 @@ defmodule MyApp.Mailings.TemplatedDelivery do
     distribution :send_latency,
       unit: {:native, :millisecond},
       buckets: [10, 50, 100, 250, 500, 1_000, 5_000],
-      tags: [:provider]
+      tags: [provider: [:ses, :smtp]]
   end
 end
 ```
+
+A tag entry written `key: [value, ...]` is a closed tag: every emission must
+carry it, with one of the listed values, and the whole enumeration lives in one
+metric name rather than one name per value. An entry written `key` is open, and
+a call site may pass any value or none at all. A distribution's value is
+measured by the call site, not by the package.
 
 Emit them where the outcome becomes known, not from the action lifecycle: an
 action returning `{:ok, _}` does not mean the email was delivered.
 
 ```elixir
 AshMetrics.increment(MyApp.Mailings.TemplatedDelivery, :delivery,
-  outcome: :sent,
-  tags: %{provider: "ses", template: "welcome_v2"},
+  tags: %{status: :sent, provider: "ses", template: "welcome_v2"},
   metadata: changeset.context
 )
 
 AshMetrics.observe(MyApp.Mailings.TemplatedDelivery, :send_latency, 142,
-  tags: %{provider: "ses"},
+  tags: %{provider: :ses},
   metadata: changeset.context
 )
 ```
@@ -138,16 +142,16 @@ like Ash event metadata — a changeset's context will do — and the extractor
 pulls the tags that belong on every emission. The default pulls the tenant, and
 refuses to stringify a struct into a tag value.
 
-An outcome that was not declared, or a tag key that was not allowed, raises
-rather than emitting.
+A missing closed tag, a value that tag does not declare, or a tag key that was
+not declared at all raises rather than emitting.
 
 The declarations themselves are checked while the resource compiles: metric
-names must be unique, a counter needs at least one outcome and no duplicates,
-tag keys must be unique and must not collide with the outcome tag or with the
-keys the tag extractor adds, and buckets must be strictly ascending positive
-numbers. Spark reports a failed check as a compiler warning pointing at the
-offending declaration, so compile with `mix compile --warnings-as-errors` in CI
-if a bad declaration should fail the build.
+names must be unique, tag keys must be unique and must not collide with the
+keys the tag extractor adds, a closed tag needs at least one value and no
+duplicates, and buckets must be strictly ascending positive numbers. Spark
+reports a failed check as a compiler warning pointing at the offending
+declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
+declaration should fail the build.
 
 See the [DSL reference](documentation/dsls/DSL-AshMetrics.md) for every option.
 
@@ -276,11 +280,10 @@ defmodule MyApp.MailingsTest do
     MyApp.Mailings.deliver!(...)
 
     assert_metric_emitted "myapp.mailings.templated_delivery.delivery",
-      outcome: :sent,
-      tags: %{provider: "ses"}
+      tags: %{status: :sent, provider: "ses"}
 
     refute_metric_emitted "myapp.mailings.templated_delivery.delivery",
-      outcome: :bounced
+      tags: %{status: :bounced}
   end
 end
 ```

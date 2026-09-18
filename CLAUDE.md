@@ -64,9 +64,10 @@ These are decisions already made. Do not relitigate them in code.
   action lifecycle. An action returning `{:ok, _}` means the function returned
   an ok tuple, not that the business outcome happened; outcomes often land in a
   notifier or webhook long afterwards.
-- **Outcome is a tag, not a name segment.** A counter with five outcomes is one
-  metric name carrying an `outcome` tag with five values, not five metric names.
-  `outcomes:` in the DSL compiles to a compile-time-validated tag-value set.
+- **An enumerated dimension is a tag, not a name segment.** A counter broken
+  down five ways is one metric name carrying a tag with five values, never five
+  metric names. A `tags` entry written `key: [value, ...]` declares that closed
+  set; it is validated when the resource compiles and on every emission.
 - **`prefix` is required configuration, never derived.** Deriving it from
   `otp_app` is unreliable at compile time and in releases, and a wrong metric
   name is a permanent broken contract. A verifier rejects the resource when it
