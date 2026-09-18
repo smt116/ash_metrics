@@ -1,9 +1,6 @@
 # AshMetrics
 
-**Status:** pre-release, not on Hex. Counters, distributions, gauges with their
-polling from either a timer or Oban, the emission API, the behaviours and the
-test helpers work. The OpenTelemetry backend does not exist yet; with the
-default `Backend.Noop` the host application's own reporter ships the metrics.
+[![Hex.pm](https://img.shields.io/hexpm/v/ash_metrics.svg)](https://hex.pm/packages/ash_metrics) [![Documentation](https://img.shields.io/badge/docs-hexdocs-purple.svg)](https://hexdocs.pm/ash_metrics)
 
 ## What it is
 
@@ -30,7 +27,7 @@ OTLP, StatsD, Prometheus, AppSignal. Counter emission is a synchronous
 
 ## Installation
 
-Once the package is on Hex, one command does the whole installation:
+One command does the whole installation:
 
 ```sh
 mix igniter.install ash_metrics
@@ -45,11 +42,15 @@ optional configuration keys with their defaults, and prints a reporter snippet
 to add by hand when it finds no telemetry module. See
 `mix ash_metrics.install`.
 
-The package is not on Hex yet. Until it is, and for a project that would rather
-not run an installer, install by hand: add the dependency, write the
-configuration block below, and wire the metrics into your reporter and
-supervision tree as [Wiring into your reporter](#wiring-into-your-reporter)
-describes.
+To install by hand, add the dependency:
+
+```elixir
+{:ash_metrics, "~> 0.1"}
+```
+
+Then write the configuration block below and wire the metrics into your
+reporter and supervision tree as
+[Wiring into your reporter](#wiring-into-your-reporter) describes.
 
 Configuration:
 
