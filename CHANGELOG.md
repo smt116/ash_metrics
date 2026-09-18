@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to
 [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [0.1.0] - 2026-09-18
 
 ### Added
@@ -37,3 +39,6 @@ and this project adheres to
 - `mix ash_metrics.install`, an Igniter task run as
   `mix igniter.install ash_metrics`, which writes the configuration and wires
   the metrics into the host application's reporter and supervision tree.
+
+[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/smt116/ash_metrics/releases/tag/v0.1.0
