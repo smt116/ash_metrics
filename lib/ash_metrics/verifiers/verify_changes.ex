@@ -9,8 +9,16 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
     gauge or a distribution
   * the attribute is an attribute of the resource
   * the counter declares the attribute as a tag
-  * every other closed tag of the counter names an attribute of the resource,
-    since the change has nowhere else to read a required tag from
+  * every closed tag of the counter names an attribute of the resource, since
+    the change has nowhere else to read a required tag from
+
+  For `AshMetrics.Changes.ObserveElapsed`:
+
+  * the distribution is declared on the resource, and is a distribution
+  * `from`, and `to` unless it is `:now`, are datetime attributes of the
+    resource
+  * the distribution's `unit` is a time unit
+  * every closed tag of the distribution names an attribute of the resource
 
   See `AshMetrics` for how a verifier failure is reported.
   """
@@ -20,6 +28,7 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   alias Ash.Resource.Change
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Changes.IncrementOnChange
+  alias AshMetrics.Changes.ObserveElapsed
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Dsl.Gauge
@@ -30,6 +39,13 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
 
   @typedoc "An action name, or `nil` for a change declared on the resource."
   @type source :: atom() | nil
+
+  @datetime_types [
+    Ash.Type.UtcDatetime,
+    Ash.Type.UtcDatetimeUsec,
+    Ash.Type.NaiveDatetime,
+    Ash.Type.DateTime
+  ]
 
   @impl Spark.Dsl.Verifier
   @spec verify(map()) :: :ok | {:error, Exception.t()}
@@ -58,28 +74,38 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
 
   @spec verify_change(map(), source(), Change.t()) :: :ok | {:error, Exception.t()}
   defp verify_change(dsl_state, source, %Change{change: {IncrementOnChange, opts}} = change) do
-    with {:ok, counter} <- counter(dsl_state, source, change, opts[:counter]),
+    with {:ok, counter} <- metric(dsl_state, source, change, opts[:counter], Counter),
          :ok <- verify_attribute(dsl_state, source, change, counter, opts[:attribute]),
          do: verify_closed_tags(dsl_state, source, change, counter)
   end
 
+  defp verify_change(dsl_state, source, %Change{change: {ObserveElapsed, opts}} = change) do
+    with {:ok, distribution} <-
+           metric(dsl_state, source, change, opts[:distribution], Distribution),
+         :ok <- verify_unit(dsl_state, source, change, distribution),
+         :ok <- verify_timestamps(dsl_state, source, change, opts),
+         do: verify_closed_tags(dsl_state, source, change, distribution)
+  end
+
   defp verify_change(_dsl_state, _source, _change), do: :ok
 
-  @spec counter(map(), source(), Change.t(), atom()) ::
-          {:ok, Counter.t()} | {:error, Exception.t()}
-  defp counter(dsl_state, source, change, name) do
+  @spec metric(map(), source(), Change.t(), atom(), module()) ::
+          {:ok, Counter.t() | Distribution.t()} | {:error, Exception.t()}
+  defp metric(dsl_state, source, change, name, expected) do
+    wanted = kind(struct(expected))
+
     case Info.metric(dsl_state, name) do
-      {:ok, %Counter{} = counter} ->
-        {:ok, counter}
+      {:ok, %^expected{} = metric} ->
+        {:ok, metric}
 
       {:ok, other} ->
         error(
           dsl_state,
           source,
           change,
-          "#{where(source)} increments #{inspect(name)}, which is a " <>
-            "#{kind(other)} rather than a counter. Declare a counter, or " <>
-            "point the change at one."
+          "#{where(source)} emits #{inspect(name)}, which is a #{kind(other)} " <>
+            "rather than a #{wanted}. Declare a #{wanted}, or point the " <>
+            "change at one."
         )
 
       :error ->
@@ -87,11 +113,66 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           dsl_state,
           source,
           change,
-          "#{where(source)} increments #{inspect(name)}, which this resource " <>
-            "does not declare. Declare `counter #{inspect(name)}` in the " <>
-            "metrics block. Declared metrics: #{metrics(dsl_state)}"
+          "#{where(source)} emits #{inspect(name)}, which this resource does " <>
+            "not declare. Declare `#{wanted} #{inspect(name)}` in the metrics " <>
+            "block. Declared metrics: #{metrics(dsl_state)}"
         )
     end
+  end
+
+  @spec verify_unit(map(), source(), Change.t(), Distribution.t()) ::
+          :ok | {:error, Exception.t()}
+  defp verify_unit(dsl_state, source, change, distribution) do
+    if ObserveElapsed.time_unit?(distribution.unit) do
+      :ok
+    else
+      error(
+        dsl_state,
+        source,
+        change,
+        "#{where(source)} measures an elapsed time into " <>
+          "#{inspect(distribution.name)}, whose unit " <>
+          "#{inspect(distribution.unit)} is not a time unit. Declare that " <>
+          "distribution with `unit: :second`, `:millisecond`, `:microsecond` " <>
+          "or `:nanosecond`."
+      )
+    end
+  end
+
+  @spec verify_timestamps(map(), source(), Change.t(), keyword()) ::
+          :ok | {:error, Exception.t()}
+  defp verify_timestamps(dsl_state, source, change, opts) do
+    [from: opts[:from], to: Keyword.get(opts, :to, :now)]
+    |> Enum.reject(fn {_key, name} -> name == :now end)
+    |> Enum.reduce_while(:ok, fn {key, name}, :ok ->
+      case ResourceInfo.attribute(dsl_state, name) do
+        %{type: type} when type in @datetime_types ->
+          {:cont, :ok}
+
+        %{type: type} ->
+          {:halt,
+           error(
+             dsl_state,
+             source,
+             change,
+             "#{where(source)} measures an elapsed time with " <>
+               "`#{key}: #{inspect(name)}`, whose type #{inspect(type)} is " <>
+               "not a datetime. An elapsed time is measured between " <>
+               "attributes of type #{list(@datetime_types)}."
+           )}
+
+        nil ->
+          {:halt,
+           error(
+             dsl_state,
+             source,
+             change,
+             "#{where(source)} measures an elapsed time with " <>
+               "`#{key}: #{inspect(name)}`, which is not an attribute of " <>
+               "this resource. Declared attributes: #{attributes(dsl_state)}"
+           )}
+      end
+    end)
   end
 
   @spec verify_attribute(map(), source(), Change.t(), Counter.t(), atom()) ::
@@ -124,10 +205,10 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
     end
   end
 
-  @spec verify_closed_tags(map(), source(), Change.t(), Counter.t()) ::
+  @spec verify_closed_tags(map(), source(), Change.t(), Counter.t() | Distribution.t()) ::
           :ok | {:error, Exception.t()}
-  defp verify_closed_tags(dsl_state, source, change, counter) do
-    counter.tag_values
+  defp verify_closed_tags(dsl_state, source, change, metric) do
+    metric.tag_values
     |> Map.keys()
     |> Enum.reject(&ResourceInfo.attribute(dsl_state, &1))
     |> case do
@@ -139,11 +220,11 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           dsl_state,
           source,
           change,
-          "#{where(source)} increments #{inspect(counter.name)}, whose closed " <>
-            "tag #{inspect(tag)} is not an attribute of this resource. The " <>
-            "change reads every tag but the counted one off the record, so no " <>
-            "emission could ever carry it. Make it an attribute, open the tag, " <>
-            "or emit that counter by hand."
+          "#{where(source)} emits #{inspect(metric.name)}, whose closed tag " <>
+            "#{inspect(tag)} is not an attribute of this resource. The change " <>
+            "reads its tags off the written record, so no emission could ever " <>
+            "carry it. Make it an attribute, open the tag, or emit that " <>
+            "#{kind(metric)} by hand."
         )
     end
   end
@@ -153,6 +234,7 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   defp where(action), do: "action #{inspect(action)}"
 
   @spec kind(Info.metric()) :: String.t()
+  defp kind(%Counter{}), do: "counter"
   defp kind(%Distribution{}), do: "distribution"
   defp kind(%Gauge{}), do: "gauge"
 

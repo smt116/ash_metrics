@@ -74,7 +74,8 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Verifiers.VerifyTenantSource
         ],
         "Action changes": [
-          AshMetrics.Changes.IncrementOnChange
+          AshMetrics.Changes.IncrementOnChange,
+          AshMetrics.Changes.ObserveElapsed
         ],
         Behaviours: [
           AshMetrics.Backend,

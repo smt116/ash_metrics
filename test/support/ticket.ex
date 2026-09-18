@@ -16,6 +16,11 @@ defmodule AshMetrics.Test.Ticket do
         status: [:open, :in_progress, :resolved, :closed]
       ],
       description: "Ticket status transitions"
+
+    distribution :time_to_resolve,
+      unit: :millisecond,
+      tags: [priority: [:low, :high]],
+      description: "Time from opening a ticket to resolving it"
   end
 
   attributes do
@@ -31,6 +36,10 @@ defmodule AshMetrics.Test.Ticket do
     create_timestamp :inserted_at
 
     attribute :resolved_at, :utc_datetime_usec, public?: true, allow_nil?: true
+
+    # Naive, so that an elapsed time between the two kinds of timestamp can be
+    # measured.
+    attribute :acknowledged_at, :naive_datetime, public?: true, allow_nil?: true
   end
 
   actions do
@@ -48,6 +57,30 @@ defmodule AshMetrics.Test.Ticket do
       accept [:status, :resolved_at]
 
       change AshMetrics.increment_on_change(:transitions, :status)
+
+      change AshMetrics.observe_elapsed(:time_to_resolve,
+               from: :inserted_at,
+               to: :resolved_at
+             ),
+             where: [attribute_equals(:status, :resolved)]
+    end
+
+    # Measures to `:now` rather than to an attribute, and writes nothing.
+    update :touch do
+      require_atomic? false
+
+      change AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at)
+    end
+
+    # Measures between a utc and a naive timestamp.
+    update :acknowledge do
+      require_atomic? false
+      accept [:acknowledged_at]
+
+      change AshMetrics.observe_elapsed(:time_to_resolve,
+               from: :inserted_at,
+               to: :acknowledged_at
+             )
     end
 
     # Carries the change while touching another attribute, so that a status

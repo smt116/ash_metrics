@@ -16,7 +16,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "action :update_status increments :nope, which this resource"
+      assert message =~ "action :update_status emits :nope, which this resource does not"
       assert message =~ "Declared metrics: :transitions"
     end
 
@@ -28,7 +28,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
                )
 
       assert Exception.message(error) =~
-               "increments :transitions, which is a distribution rather than a counter"
+               "emits :transitions, which is a distribution rather than a counter"
     end
 
     test "a gauge is refused too" do
@@ -105,7 +105,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
                  ]
                )
 
-      assert Exception.message(error) =~ "the resource-level change increments :nope"
+      assert Exception.message(error) =~ "the resource-level change emits :nope"
     end
 
     test "a change of another kind is left alone" do
@@ -120,16 +120,149 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
     end
   end
 
+  describe "observe_elapsed/2" do
+    test "the distribution must be declared" do
+      assert [%DslError{path: [:actions, :update_status]} = error] =
+               elapsed_errors(
+                 quote(do: distribution(:time_to_resolve, unit: :millisecond)),
+                 quote(do: change(AshMetrics.observe_elapsed(:nope, from: :inserted_at)))
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "action :update_status emits :nope, which this resource does not declare"
+      assert message =~ "Declare `distribution :nope`"
+    end
+
+    test "the metric must be a distribution" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(do: counter(:time_to_resolve)),
+                 quote(
+                   do: change(AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at))
+                 )
+               )
+
+      assert Exception.message(error) =~
+               "emits :time_to_resolve, which is a counter rather than a distribution"
+    end
+
+    test "a conversion unit is not a time unit" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(do: distribution(:time_to_resolve, unit: {:native, :millisecond})),
+                 quote(
+                   do: change(AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at))
+                 )
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "whose unit {:native, :millisecond} is not a time unit"
+      assert message =~ "`unit: :second`, `:millisecond`, `:microsecond` or `:nanosecond`"
+    end
+
+    test "the default unit is not a time unit either" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(do: distribution(:time_to_resolve)),
+                 quote(
+                   do: change(AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at))
+                 )
+               )
+
+      assert Exception.message(error) =~ "whose unit :unit is not a time unit"
+    end
+
+    test "the timestamps must be attributes of the resource" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(do: distribution(:time_to_resolve, unit: :millisecond)),
+                 quote(
+                   do:
+                     change(
+                       AshMetrics.observe_elapsed(:time_to_resolve,
+                         from: :inserted_at,
+                         to: :nope
+                       )
+                     )
+                 )
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "measures an elapsed time with `to: :nope`, which is not an attribute"
+      assert message =~ "Declared attributes: :id, :status, :inserted_at, :resolved_at"
+    end
+
+    test "the timestamps must be datetime attributes" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(do: distribution(:time_to_resolve, unit: :millisecond)),
+                 quote(
+                   do:
+                     change(
+                       AshMetrics.observe_elapsed(:time_to_resolve,
+                         from: :status,
+                         to: :resolved_at
+                       )
+                     )
+                 )
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "measures an elapsed time with `from: :status`, whose type Ash.Type.Atom"
+      assert message =~ "Ash.Type.UtcDatetime, Ash.Type.UtcDatetimeUsec"
+    end
+
+    test "every closed tag of the distribution must name an attribute" do
+      assert [%DslError{} = error] =
+               elapsed_errors(
+                 quote(
+                   do:
+                     distribution(:time_to_resolve,
+                       unit: :millisecond,
+                       tags: [region: [:eu, :us]]
+                     )
+                 ),
+                 quote(
+                   do: change(AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at))
+                 )
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "whose closed tag :region is not an attribute of this resource"
+      assert message =~ "emit that distribution by hand"
+    end
+
+    test "a valid declaration produces no errors" do
+      assert elapsed_errors(
+               quote(do: distribution(:time_to_resolve, unit: :millisecond, tags: [:status])),
+               quote(
+                 do:
+                   change(
+                     AshMetrics.observe_elapsed(:time_to_resolve,
+                       from: :inserted_at,
+                       to: :resolved_at
+                     )
+                   )
+               )
+             ) == []
+    end
+  end
+
   # An `update` action carrying `change`, on a resource with a `status`
   # attribute, which is what every declaration under test is attached to.
-  defp errors(metrics, change) do
+  defp errors(metrics, change, attributes \\ []) do
     Compiler.dsl_errors(
       quote do
         metrics do
           unquote(metrics)
         end
       end,
-      [quote(do: attribute(:status, :atom))],
+      [quote(do: attribute(:status, :atom))] ++ attributes,
       [
         quote do
           actions do
@@ -142,5 +275,14 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
         end
       ]
     )
+  end
+
+  # The same resource with the two timestamps an elapsed time is measured
+  # between.
+  defp elapsed_errors(metrics, change) do
+    errors(metrics, change, [
+      quote(do: attribute(:inserted_at, :utc_datetime_usec)),
+      quote(do: attribute(:resolved_at, :utc_datetime_usec))
+    ])
   end
 end

@@ -69,6 +69,7 @@ defmodule AshMetrics do
   alias Ash.Domain.Info, as: DomainInfo
   alias AshMetrics.Backend
   alias AshMetrics.Changes.IncrementOnChange
+  alias AshMetrics.Changes.ObserveElapsed
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
@@ -244,6 +245,45 @@ defmodule AshMetrics do
   @spec increment_on_change(atom(), atom()) :: {module(), keyword()}
   def increment_on_change(metric, attribute) do
     {IncrementOnChange, counter: metric, attribute: attribute}
+  end
+
+  @doc """
+  Declares a `change` that records the time between two timestamps of the
+  written record into the distribution `metric`.
+
+  Use it on the action that writes the later timestamp, with `where:` when
+  only one transition should be measured:
+
+      update :update_status do
+        accept [:status, :delivered_at]
+        require_atomic? false
+
+        change AshMetrics.observe_elapsed(:delivery_time,
+                 from: :inserted_at,
+                 to: :delivered_at
+               ),
+               where: [attribute_equals(:status, :delivered)]
+      end
+
+  ## Options
+
+  * `:from` — the attribute holding the earlier timestamp. Required.
+  * `:to` — the attribute holding the later timestamp, or `:now` for the
+    moment the hook runs. Defaults to `:now`.
+
+  Both attributes must be datetime attributes and the distribution's `unit`
+  must be a time unit; a verifier rejects the resource otherwise.
+
+  `AshMetrics.Changes.ObserveElapsed` documents what is observed, when, and
+  why the action needs `require_atomic? false`.
+  """
+  @spec observe_elapsed(atom(), keyword()) :: {module(), keyword()}
+  def observe_elapsed(metric, opts) do
+    {ObserveElapsed,
+     opts
+     |> Keyword.take([:from, :to])
+     |> Keyword.put_new(:to, :now)
+     |> Keyword.put(:distribution, metric)}
   end
 
   @doc false
