@@ -68,9 +68,13 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Dsl.Tags,
           AshMetrics.Info,
           AshMetrics.Supervisor,
+          AshMetrics.Verifiers.VerifyChanges,
           AshMetrics.Verifiers.VerifyMetrics,
           AshMetrics.Verifiers.VerifyPrefix,
           AshMetrics.Verifiers.VerifyTenantSource
+        ],
+        "Action changes": [
+          AshMetrics.Changes.IncrementOnChange
         ],
         Behaviours: [
           AshMetrics.Backend,

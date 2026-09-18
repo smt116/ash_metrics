@@ -16,12 +16,14 @@ defmodule AshMetrics.Test.Ets do
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
   alias AshMetrics.Test.Tenants
+  alias AshMetrics.Test.Ticket
 
   @spec clear!() :: :ok
   def clear! do
     clear!(Job)
     clear!(TenantJob)
     clear!(GlobalTenantJob)
+    clear!(Ticket)
 
     Enum.each(Tenants.list_tenants(), &clear!(SchemaJob, &1))
   end

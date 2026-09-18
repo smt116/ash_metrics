@@ -15,9 +15,9 @@ defmodule AshMetrics.Test.Compiler do
 
   require Spark.Test
 
-  @spec dsl_errors(Macro.t(), [Macro.t()]) :: [Spark.Error.DslError.t()]
-  def dsl_errors(metrics_block, attributes \\ []) do
-    metrics_block |> compile_resource(attributes) |> dsl_errors_for()
+  @spec dsl_errors(Macro.t(), [Macro.t()], [Macro.t()]) :: [Spark.Error.DslError.t()]
+  def dsl_errors(metrics_block, attributes \\ [], blocks \\ []) do
+    metrics_block |> compile_resource(attributes, blocks) |> dsl_errors_for()
   end
 
   # Re-verifies a module that is already compiled, which is how a verifier that
@@ -32,13 +32,17 @@ defmodule AshMetrics.Test.Compiler do
 
   # `attributes` are extra attribute declarations, quoted, for the resource's
   # `attributes` block. A gauge groups by attributes, so a verifier test needs
-  # more than the primary key to have anything valid to group by.
-  @spec compile_resource(Macro.t(), [Macro.t()]) :: module()
-  def compile_resource(metrics_block, attributes \\ []) do
+  # more than the primary key to have anything valid to group by. `blocks` are
+  # whole resource blocks, quoted, such as an `actions do` carrying a change.
+  @spec compile_resource(Macro.t(), [Macro.t()], [Macro.t()]) :: module()
+  def compile_resource(metrics_block, attributes \\ [], blocks \\ []) do
     module = unique_module()
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
-      Code.compile_quoted(resource(module, metrics_block, attributes, [AshMetrics]), "nofile")
+      Code.compile_quoted(
+        resource(module, metrics_block, attributes, [AshMetrics], blocks),
+        "nofile"
+      )
     end)
 
     module
@@ -69,8 +73,8 @@ defmodule AshMetrics.Test.Compiler do
     end
   end
 
-  @spec resource(module(), Macro.t(), [Macro.t()], [module()]) :: Macro.t()
-  defp resource(module, metrics_block, attributes, extensions) do
+  @spec resource(module(), Macro.t(), [Macro.t()], [module()], [Macro.t()]) :: Macro.t()
+  defp resource(module, metrics_block, attributes, extensions, blocks \\ []) do
     ExUnit.Callbacks.on_exit(fn -> purge(module) end)
 
     quote do
@@ -89,6 +93,8 @@ defmodule AshMetrics.Test.Compiler do
 
           unquote_splicing(attributes)
         end
+
+        unquote_splicing(blocks)
       end
     end
   end

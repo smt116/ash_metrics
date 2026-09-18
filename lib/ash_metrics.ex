@@ -62,11 +62,13 @@ defmodule AshMetrics do
     verifiers: [
       AshMetrics.Verifiers.VerifyPrefix,
       AshMetrics.Verifiers.VerifyMetrics,
-      AshMetrics.Verifiers.VerifyTenantSource
+      AshMetrics.Verifiers.VerifyTenantSource,
+      AshMetrics.Verifiers.VerifyChanges
     ]
 
   alias Ash.Domain.Info, as: DomainInfo
   alias AshMetrics.Backend
+  alias AshMetrics.Changes.IncrementOnChange
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
@@ -217,6 +219,31 @@ defmodule AshMetrics do
   defp gauge_message(resource, metric, kind) do
     "#{inspect(metric)} on #{inspect(resource)} is a gauge, not a #{kind}. A " <>
       "gauge is polled by AshMetrics itself and has no call site."
+  end
+
+  @doc """
+  Declares a `change` that counts `attribute` taking a new value into the
+  counter `metric`.
+
+  Use it on the action that writes the attribute:
+
+      update :update_status do
+        accept [:status]
+        require_atomic? false
+
+        change AshMetrics.increment_on_change(:delivery, :status)
+      end
+
+  The counter must declare `attribute` as one of its `tags`, open or closed;
+  the emitted tag is what the action wrote. A verifier rejects the resource
+  otherwise.
+
+  `AshMetrics.Changes.IncrementOnChange` documents what is emitted, when, and
+  why the action needs `require_atomic? false`.
+  """
+  @spec increment_on_change(atom(), atom()) :: {module(), keyword()}
+  def increment_on_change(metric, attribute) do
+    {IncrementOnChange, counter: metric, attribute: attribute}
   end
 
   @doc false
