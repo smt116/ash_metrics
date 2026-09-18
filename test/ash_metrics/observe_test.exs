@@ -80,6 +80,23 @@ defmodule AshMetrics.ObserveTest do
       assert metadata == %{provider: "ses"}
     end
 
+    test "accepts call-site tags as a keyword list" do
+      AshMetrics.observe(Delivery, :send_latency, 10, tags: [provider: "ses"])
+
+      assert_received {:emitted, _event, _measurements, metadata}
+
+      assert metadata == %{provider: "ses"}
+    end
+
+    test "raises when the tags are neither a map nor a keyword list" do
+      error =
+        assert_raise ArgumentError, fn ->
+          AshMetrics.observe(Delivery, :send_latency, 10, tags: "ses")
+        end
+
+      assert error.message == ~s(`tags:` takes a map or a keyword list, got: "ses")
+    end
+
     test "carries tags the extractor derives from metadata" do
       AshMetrics.observe(Delivery, :send_latency, 10, metadata: %{tenant: "acme"})
 

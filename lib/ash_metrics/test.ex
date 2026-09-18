@@ -84,8 +84,9 @@ defmodule AshMetrics.Test do
 
   ## Options
 
-  * `:tags` — tags that must be present. Matched as a subset, so a metric
-    carrying tags this assertion says nothing about still matches.
+  * `:tags` — tags that must be present, as a map or a keyword list. Matched
+    as a subset, so a metric carrying tags this assertion says nothing about
+    still matches.
   * `:value` — the expected observed value of a distribution.
   * `:timeout` — how long to wait, in milliseconds. Defaults to
     `#{@assert_timeout}`.
@@ -95,6 +96,8 @@ defmodule AshMetrics.Test do
   """
   @spec assert_metric_emitted(String.t(), keyword()) :: emission()
   def assert_metric_emitted(name, opts \\ []) do
+    opts = normalize(opts)
+
     case await(name, opts, Keyword.get(opts, :timeout, @assert_timeout)) do
       {:ok, emission, others} ->
         restore(others)
@@ -116,6 +119,8 @@ defmodule AshMetrics.Test do
   """
   @spec refute_metric_emitted(String.t(), keyword()) :: :ok
   def refute_metric_emitted(name, opts \\ []) do
+    opts = normalize(opts)
+
     case await(name, opts, Keyword.get(opts, :timeout, @refute_timeout)) do
       {:ok, emission, others} ->
         restore(others)
@@ -124,6 +129,14 @@ defmodule AshMetrics.Test do
       {:error, others} ->
         restore(others)
         :ok
+    end
+  end
+
+  @spec normalize(keyword()) :: keyword()
+  defp normalize(opts) do
+    case Keyword.fetch(opts, :tags) do
+      {:ok, tags} -> Keyword.put(opts, :tags, AshMetrics.tags!(tags))
+      :error -> opts
     end
   end
 

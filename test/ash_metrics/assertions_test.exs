@@ -49,6 +49,20 @@ defmodule AshMetrics.AssertionsTest do
       assert_metric_emitted(@delivery, tags: %{status: :sent, provider: "ses"})
     end
 
+    test "matches tags given as a keyword list" do
+      AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent, provider: "ses"})
+
+      assert {_measurements, tags} = assert_metric_emitted(@delivery, tags: [status: :sent])
+      assert tags == %{status: :sent, provider: "ses"}
+    end
+
+    test "raises when the expected tags are neither a map nor a keyword list" do
+      error =
+        assert_raise ArgumentError, fn -> assert_metric_emitted(@delivery, tags: "sent") end
+
+      assert error.message == ~s(`tags:` takes a map or a keyword list, got: "sent")
+    end
+
     test "matches a distribution by value" do
       AshMetrics.observe(Delivery, :send_latency, 142, tags: %{provider: "ses"})
 
@@ -147,6 +161,12 @@ defmodule AshMetrics.AssertionsTest do
       AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent})
 
       assert refute_metric_emitted(@delivery, tags: %{status: :bounced}) == :ok
+    end
+
+    test "takes the expected tags as a keyword list" do
+      AshMetrics.increment(Delivery, :delivery, tags: %{status: :sent})
+
+      assert refute_metric_emitted(@delivery, tags: [status: :bounced]) == :ok
     end
 
     test "leaves the emission it refused to match in the mailbox" do

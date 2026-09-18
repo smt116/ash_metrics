@@ -99,13 +99,15 @@ defmodule AshMetrics do
   `ArgumentError`:
 
   * `metric` must be a declared `counter` on `resource`
+  * `tags` must be a map or a keyword list
   * every key of `tags` must be one of that counter's declared tags
   * every closed tag of that counter must be present, with one of its declared
     values
 
   ## Options
 
-  * `:tags` — a map of call-site tags, defaulting to `%{}`.
+  * `:tags` — the call-site tags, as a map or a keyword list, defaulting to
+    `%{}`.
   * `:metadata` — a map passed to the configured `AshMetrics.TagExtractor`,
     defaulting to `%{}`. Anything shaped like Ash event metadata will do; a
     changeset's context is the usual thing to pass.
@@ -152,9 +154,10 @@ defmodule AshMetrics do
 
   As with `increment/3`, everything is checked before the event is executed and
   anything wrong raises `ArgumentError`: `metric` must be a declared
-  `distribution` on `resource`, `value` must be a number, every key of `tags`
-  must be one of that distribution's declared tags, and every closed tag must
-  be present with one of its declared values.
+  `distribution` on `resource`, `value` must be a number, `tags` must be a map
+  or a keyword list, every key of `tags` must be one of that distribution's
+  declared tags, and every closed tag must be present with one of its declared
+  values.
 
   The value is recorded in whatever unit the declaration says. A declaration
   with a conversion unit such as `{:native, :millisecond}` converts when the
@@ -163,7 +166,8 @@ defmodule AshMetrics do
 
   ## Options
 
-  * `:tags` — a map of call-site tags, defaulting to `%{}`.
+  * `:tags` — the call-site tags, as a map or a keyword list, defaulting to
+    `%{}`.
   * `:metadata` — a map passed to the configured `AshMetrics.TagExtractor`,
     defaulting to `%{}`.
 
@@ -215,9 +219,28 @@ defmodule AshMetrics do
       "gauge is polled by AshMetrics itself and has no call site."
   end
 
+  @doc false
+  @spec tags!(term()) :: tags()
+  def tags!(tags) when is_map(tags), do: tags
+
+  def tags!(tags) when is_list(tags) do
+    if Keyword.keyword?(tags) do
+      Map.new(tags)
+    else
+      raise ArgumentError, tags_message(tags)
+    end
+  end
+
+  def tags!(tags), do: raise(ArgumentError, tags_message(tags))
+
+  @spec tags_message(term()) :: String.t()
+  defp tags_message(tags) do
+    "`tags:` takes a map or a keyword list, got: #{inspect(tags)}"
+  end
+
   @spec tags(module(), Counter.t() | Distribution.t(), keyword()) :: tags()
   defp tags(resource, metric, opts) do
-    explicit = Keyword.get(opts, :tags, %{})
+    explicit = opts |> Keyword.get(:tags, %{}) |> tags!()
     declared_tags!(resource, metric, explicit)
     declared_values!(resource, metric, explicit)
 
