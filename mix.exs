@@ -141,6 +141,13 @@ defmodule AshMetrics.MixProject do
       # Needed only by `AshMetrics.Poller.AshOban`, which is not the default
       # poller. An application that polls from a timer never loads it.
       {:ash_oban, "~> 0.8", optional: true},
+      # Needed only by `AshMetrics.Backend.Otel`, which creates OpenTelemetry
+      # observable gauges through `:otel_meter`. An application that exports
+      # through any other reporter never loads it.
+      {:opentelemetry_api_experimental, "~> 0.6", optional: true},
+      # The `Telemetry.Metrics` bridge `AshMetrics.Backend.Otel` adapts the
+      # metric definitions for. Never called from this package.
+      {:otel_telemetry_metrics, "~> 0.1", optional: true},
       # Only the Postgres integration suite needs a SQL data layer. `:dev` is
       # in the list because `.formatter.exs` imports it and `mix format` runs
       # in `:dev`.
