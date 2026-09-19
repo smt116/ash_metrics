@@ -190,9 +190,8 @@ if Code.ensure_loaded?(:otel_meter) do
       end
     end
 
-    # The count runs in a task so that it can be abandoned when it overruns
-    # the timeout. Nothing it does may exit the caller: the callback runs in
-    # the SDK's collection process.
+    # The caller is the SDK's collection process. A count that overruns the
+    # timeout is abandoned, and nothing the count does may exit the caller.
     @spec counted(module(), Gauge.t()) :: {:ok, term()} | {:exit, term()} | nil
     defp counted(resource, %Gauge{} = gauge) do
       task = Task.async(fn -> poll(resource, gauge) end)

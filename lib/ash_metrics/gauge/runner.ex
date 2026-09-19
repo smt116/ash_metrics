@@ -56,7 +56,7 @@ defmodule AshMetrics.Gauge.Runner do
   gauge's strategy. Nothing is emitted and no group is zeroed; `emit/3` does
   both.
 
-  Errors are returned rather than raised, but a strategy that raises is not
+  An error the strategy returns is returned; an exception it raises is not
   caught here.
   """
   @spec poll(module(), Gauge.t()) :: {:ok, [Strategy.group()]} | {:error, term()}
