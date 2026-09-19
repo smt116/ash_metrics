@@ -2,6 +2,10 @@
 
 [![Hex.pm](https://img.shields.io/hexpm/v/ash_metrics.svg)](https://hex.pm/packages/ash_metrics) [![Documentation](https://img.shields.io/badge/docs-hexdocs-purple.svg)](https://hexdocs.pm/ash_metrics)
 
+**Experimental.** The DSL, the configuration keys and the public API may
+change between minor releases until 1.0. Every such change is listed in the
+[changelog](CHANGELOG.md).
+
 ## What it is
 
 AshMetrics is an Ash resource extension that adds a `metrics do` block for
