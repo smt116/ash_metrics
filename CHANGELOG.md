@@ -22,8 +22,10 @@ and this project adheres to
   gauges' last-value definitions, which the bridge rejects, carries a
   distribution's declared buckets on as the histogram's bucket boundaries,
   and reports the gauges as OpenTelemetry observable gauges counted on
-  demand. `mix ash_metrics.install` prints how to select it when the
-  application depends on the bridge.
+  demand, each count bounded by a configurable `timeout`. It needs the new
+  optional dependency `opentelemetry_api_experimental`.
+  `mix ash_metrics.install` prints how to select it when the application
+  depends on the bridge.
 - `c:AshMetrics.Backend.polls_gauges?/0`, an optional callback with which a
   backend declares that it reports the gauges itself. `AshMetrics.child_specs/1`
   then starts no gauge poller, whatever its `:poll` option says.
