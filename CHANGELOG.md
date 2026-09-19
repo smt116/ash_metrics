@@ -28,7 +28,7 @@ and this project adheres to
   optional dependency `opentelemetry_api_experimental`.
   `mix ash_metrics.install` prints how to select it when the application
   depends on the bridge.
-- `c:AshMetrics.Backend.polls_gauges?/0`, an optional callback with which a
+- `polls_gauges?/0` on `AshMetrics.Backend`, an optional callback with which a
   backend declares that it reports the gauges itself. `AshMetrics.child_specs/1`
   then starts no gauge poller, whatever its `:poll` option says.
 - `AshMetrics.Gauge.Runner.poll/2`, which computes one gauge's value per group

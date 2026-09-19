@@ -9,12 +9,10 @@ if Code.ensure_loaded?(:otel_meter) do
 
         config :ash_metrics, backend: AshMetrics.Backend.Otel
 
-        config :ash_metrics, AshMetrics.Backend.Otel, timeout: 5_000
-
     ## What it changes
 
     * Every `Telemetry.Metrics.LastValue` is dropped from that list. The
-      gauges those stood for are reported as OpenTelemetry observable gauges
+      gauges those stood for are exported as OpenTelemetry observable gauges
       instead.
     * A `Telemetry.Metrics.Distribution` declaring `buckets` carries them on
       as the histogram's `explicit_bucket_boundaries`, under the `:otel`
@@ -22,33 +20,34 @@ if Code.ensure_loaded?(:otel_meter) do
       other reporter.
     * Everything else is passed through unchanged.
 
-    ## How a gauge is counted
+    ## How a gauge is exported
 
     Starting the backend creates one observable gauge instrument per declared
     gauge, named as the dropped `Telemetry.Metrics.LastValue` was. Its
-    callback counts the gauge through `AshMetrics.Gauge.Runner.poll/2` when
-    the collector asks for a value, at most once per the gauge's `period` per
-    node; a collection that arrives within that period of the last count is
-    served the values that count produced.
+    callback serves the groups the configured `AshMetrics.Poller` last
+    reported for that gauge on this node, for twice the gauge's `period` after
+    that report. Outside that window, and before the first report, it serves
+    nothing, and the SDK forgets an observable instrument whose callback
+    returns nothing: this node then exports no series for that gauge in that
+    collection cycle.
 
-    A count is given `timeout` milliseconds. One that overruns it is killed,
-    and the values of the last count that finished are reported again, as they
-    are when the count fails. Either way the failure is logged as a warning
-    and the next collection counts again.
+    A group that was reported and is absent from the next report is served as
+    a zero, and goes on being served as a zero until the node restarts.
 
-    A group that has vanished since it was last counted is reported as a zero,
-    and goes on being reported as a zero until the node restarts.
+    With `AshMetrics.Poller.AshOban` one node runs each poll and only that
+    node holds a value, so the cluster exports one series per gauge from one
+    query per period. With `AshMetrics.Poller.GenServer` every node polls and
+    exports its own series.
 
     Tag values reach OpenTelemetry as attributes: an atom, a binary, a number
     or a boolean as it is, a struct not at all, and anything else inspected.
 
-    ## Polling
+    ## Starting it
 
-    This backend reports the gauges itself, so `AshMetrics.child_specs/1`
-    starts no gauge poller for it; see
-    `c:AshMetrics.Backend.polls_gauges?/0`. Do not select
-    `AshMetrics.Poller.AshOban` alongside it: its Oban schedules would keep
-    running and emit measurements nothing reports.
+    This backend has to be running before a poller reports to it;
+    `AshMetrics.child_specs/1` puts it before the pollers, and
+    `AshMetrics.Supervisor` starts exactly that list. A report that arrives
+    while it is not running is logged as an error and dropped.
     """
 
     @behaviour AshMetrics.Backend
@@ -57,9 +56,7 @@ if Code.ensure_loaded?(:otel_meter) do
 
     require Logger
 
-    alias AshMetrics.Config
     alias AshMetrics.Dsl.Gauge
-    alias AshMetrics.Gauge.Runner
     alias AshMetrics.Gauge.Strategy
     alias AshMetrics.NameBuilder
     alias AshMetrics.Poller
@@ -79,10 +76,6 @@ if Code.ensure_loaded?(:otel_meter) do
     end
 
     @impl AshMetrics.Backend
-    @spec polls_gauges?() :: true
-    def polls_gauges?, do: true
-
-    @impl AshMetrics.Backend
     @spec transform_metrics([Telemetry.Metrics.t()], keyword()) :: [Telemetry.Metrics.t()]
     def transform_metrics(metrics, _opts) do
       metrics
@@ -90,12 +83,23 @@ if Code.ensure_loaded?(:otel_meter) do
       |> Enum.map(&boundaries/1)
     end
 
+    @impl AshMetrics.Backend
+    @spec report_gauge(module(), Gauge.t(), [Strategy.group()]) :: :ok
+    def report_gauge(resource, %Gauge{} = gauge, groups) do
+      if :ets.whereis(@table) == :undefined do
+        not_running(resource, gauge)
+      else
+        store(resource, gauge, groups)
+      end
+    end
+
     @doc """
-    Starts the process that owns the instruments and the counts they serve.
+    Starts the process that owns the instruments and the observations they
+    serve.
 
     ## Options
 
-    * `:gauges` — the gauges to report, as `{resource, gauge}` tuples.
+    * `:gauges` — the gauges to export, as `{resource, gauge}` tuples.
       Defaults to `AshMetrics.Poller.gauges/0`.
     * `:name` — a name to register the process under.
     """
@@ -126,21 +130,18 @@ if Code.ensure_loaded?(:otel_meter) do
     end
 
     @doc """
-    The current value of one gauge, for the instrument's callback.
+    The observations of one gauge, for the instrument's callback.
 
     Called by the OpenTelemetry SDK when it collects, with `{resource,
-    gauge}`. Returns one observation per group, serving the last count when it
-    is younger than the gauge's `period`.
+    gauge}`. Returns one observation per group of the last report of that
+    gauge on this node, or `[]` when there has been no report or the last one
+    is at least twice the gauge's `period` old.
     """
     @spec observe({module(), Gauge.t()}) :: [observation()]
     def observe({resource, %Gauge{} = gauge}) do
-      {counted_at, observations, known} = entry(resource, gauge)
+      {reported_at, observations, _known} = entry(resource, gauge)
 
-      if fresh?(counted_at, gauge.period) do
-        observations
-      else
-        count(resource, gauge, observations, known)
-      end
+      if fresh?(reported_at, gauge.period), do: observations, else: []
     end
 
     @spec register(:otel_meter.t(), Poller.gauge()) :: :ok
@@ -179,49 +180,24 @@ if Code.ensure_loaded?(:otel_meter) do
 
     @spec fresh?(integer() | nil, pos_integer()) :: boolean()
     defp fresh?(nil, _period), do: false
-    defp fresh?(counted_at, period), do: now() - counted_at < period
+    defp fresh?(reported_at, period), do: now() - reported_at < 2 * period
 
-    @spec count(module(), Gauge.t(), [observation()], [attributes()]) ::
-            [observation()]
-    defp count(resource, %Gauge{} = gauge, observations, known) do
-      case counted(resource, gauge) do
-        {:ok, {:ok, groups}} -> store(resource, gauge, groups, known)
-        failure -> failed(resource, gauge, failure, observations)
-      end
-    end
+    @spec store(module(), Gauge.t(), [Strategy.group()]) :: :ok
+    defp store(resource, %Gauge{} = gauge, groups) do
+      {_reported_at, _observations, known} = entry(resource, gauge)
 
-    # The caller is the SDK's collection process. A count that overruns the
-    # timeout is abandoned, and nothing the count does may exit the caller.
-    @spec counted(module(), Gauge.t()) :: {:ok, term()} | {:exit, term()} | nil
-    defp counted(resource, %Gauge{} = gauge) do
-      task = Task.async(fn -> poll(resource, gauge) end)
-
-      Task.yield(task, Config.otel_timeout()) || Task.shutdown(task, :brutal_kill)
-    end
-
-    @spec poll(module(), Gauge.t()) :: {:ok, [Strategy.group()]} | {:error, term()}
-    defp poll(resource, gauge) do
-      Runner.poll(resource, gauge)
-    rescue
-      exception -> {:error, exception}
-    catch
-      kind, reason -> {:error, {kind, reason}}
-    end
-
-    @spec store(module(), Gauge.t(), [Strategy.group()], [attributes()]) :: [observation()]
-    defp store(resource, %Gauge{} = gauge, groups, known) do
-      counted = Enum.map(groups, fn {tags, value} -> {value, attributes(tags)} end)
-      observations = counted ++ vanished(counted, known)
+      reported = Enum.map(groups, fn {tags, value} -> {value, attributes(tags)} end)
+      observations = reported ++ vanished(reported, known)
       remembered = Enum.map(observations, fn {_value, attributes} -> attributes end)
 
       :ets.insert(@table, {{resource, gauge.name}, now(), observations, remembered})
 
-      observations
+      :ok
     end
 
     @spec vanished([observation()], [attributes()]) :: [observation()]
-    defp vanished(counted, known) do
-      present = MapSet.new(counted, fn {_value, attributes} -> attributes end)
+    defp vanished(reported, known) do
+      present = MapSet.new(reported, fn {_value, attributes} -> attributes end)
 
       known
       |> Enum.uniq()
@@ -229,22 +205,16 @@ if Code.ensure_loaded?(:otel_meter) do
       |> Enum.map(&{0, &1})
     end
 
-    @spec failed(module(), Gauge.t(), term(), [observation()]) :: [observation()]
-    defp failed(resource, %Gauge{} = gauge, failure, observations) do
-      Logger.warning(
-        "AshMetrics could not count the gauge #{inspect(gauge.name)} on " <>
-          "#{inspect(resource)}: #{inspect(reason(failure))}. " <>
-          "#{length(observations)} observation(s) of the last count that " <>
-          "finished are reported instead."
+    @spec not_running(module(), Gauge.t()) :: :ok
+    defp not_running(resource, %Gauge{} = gauge) do
+      Logger.error(
+        "AshMetrics dropped a report of the gauge #{inspect(gauge.name)} on " <>
+          "#{inspect(resource)}: AshMetrics.Backend.Otel is not running, so " <>
+          "there is no instrument to serve it. Add it to the supervision tree " <>
+          "through AshMetrics.Supervisor, or through AshMetrics.child_specs/1, " <>
+          "which puts it before the pollers."
       )
-
-      observations
     end
-
-    @spec reason(term()) :: term()
-    defp reason(nil), do: {:timeout, Config.otel_timeout()}
-    defp reason({:ok, {:error, error}}), do: error
-    defp reason({:exit, error}), do: {:exit, error}
 
     @spec attributes(AshMetrics.tags()) :: attributes()
     defp attributes(tags) do

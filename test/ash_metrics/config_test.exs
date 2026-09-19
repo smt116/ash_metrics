@@ -134,30 +134,6 @@ defmodule AshMetrics.ConfigTest do
     end
   end
 
-  describe "otel_timeout/0" do
-    setup do
-      on_exit(fn -> Application.delete_env(:ash_metrics, AshMetrics.Backend.Otel) end)
-
-      :ok
-    end
-
-    test "defaults to five seconds" do
-      assert Config.otel_timeout() == 5_000
-    end
-
-    test "returns the configured timeout" do
-      Application.put_env(:ash_metrics, AshMetrics.Backend.Otel, timeout: 250)
-
-      assert Config.otel_timeout() == 250
-    end
-
-    test "defaults with the backend configured but the key absent" do
-      Application.put_env(:ash_metrics, AshMetrics.Backend.Otel, [])
-
-      assert Config.otel_timeout() == 5_000
-    end
-  end
-
   describe "defaults" do
     test "name_builder/0 defaults to the bundled builder" do
       assert Config.name_builder() == AshMetrics.NameBuilder.Default

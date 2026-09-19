@@ -109,13 +109,11 @@ if Code.ensure_loaded?(Igniter) do
 
         config :ash_metrics, backend: AshMetrics.Backend.Otel
 
-        config :ash_metrics, AshMetrics.Backend.Otel,
-          timeout: 5_000
-
     Keep splicing `AshMetrics.metrics/0` into the list your own
-    `OtelTelemetryMetrics` instance is given. The backend reports the gauges
-    itself, as OpenTelemetry observable gauges, so do not select
-    `AshMetrics.Poller.AshOban` alongside it.
+    `OtelTelemetryMetrics` instance is given. The backend exports the gauges
+    the configured poller reports as OpenTelemetry observable gauges; with
+    `AshMetrics.Poller.AshOban` that is one count and one series per gauge
+    for the whole cluster.
 
     See `AshMetrics.Backend.Otel`.
     """

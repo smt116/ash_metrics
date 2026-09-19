@@ -230,7 +230,14 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
         &String.contains?(&1, "config :ash_metrics, backend: AshMetrics.Backend.Otel")
       )
 
-      assert_has_notice(igniter, &String.contains?(&1, "timeout: 5_000"))
+      assert_has_notice(igniter, &String.contains?(&1, "The backend exports the gauges"))
+
+      assert_has_notice(
+        igniter,
+        &String.contains?(&1, "one count and one series per gauge")
+      )
+
+      refute Enum.any?(igniter.notices, &String.contains?(&1, "timeout"))
     end
 
     test "is not mentioned when the application does not depend on otel_telemetry_metrics" do

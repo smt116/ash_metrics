@@ -1,51 +1,10 @@
-defmodule AshMetrics.Backend.OtelTest.Strategy do
-  @moduledoc false
-  # A strategy answering with canned results in order, the last one repeating.
-
-  @behaviour AshMetrics.Gauge.Strategy
-
-  def start_link(results), do: Agent.start_link(fn -> results end, name: __MODULE__)
-
-  @impl AshMetrics.Gauge.Strategy
-  def compute(_resource, _gauge, _opts) do
-    Agent.get_and_update(__MODULE__, fn
-      [last] -> {last, [last]}
-      [result | rest] -> {result, rest}
-    end)
-  end
-end
-
-defmodule AshMetrics.Backend.OtelTest.Sleeping do
-  @moduledoc false
-  # A strategy that never answers, to prove the timeout.
-
-  @behaviour AshMetrics.Gauge.Strategy
-
-  @impl AshMetrics.Gauge.Strategy
-  def compute(_resource, _gauge, _opts), do: Process.sleep(:infinity)
-end
-
-defmodule AshMetrics.Backend.OtelTest.Raising do
-  @moduledoc false
-  # A strategy that raises, to prove the callback survives one.
-
-  @behaviour AshMetrics.Gauge.Strategy
-
-  @impl AshMetrics.Gauge.Strategy
-  def compute(_resource, _gauge, _opts), do: raise("no database")
-end
-
 defmodule AshMetrics.Backend.OtelTest do
-  # Owns a named ETS table and a named agent, so it cannot run alongside other
-  # tests.
+  # Owns a named ETS table, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
 
   import ExUnit.CaptureLog
 
   alias AshMetrics.Backend.Otel
-  alias AshMetrics.Backend.OtelTest.Raising
-  alias AshMetrics.Backend.OtelTest.Sleeping
-  alias AshMetrics.Backend.OtelTest.Strategy
   alias AshMetrics.Info
   alias AshMetrics.Poller
   alias AshMetrics.Test.Invoice
@@ -54,16 +13,7 @@ defmodule AshMetrics.Backend.OtelTest do
   @period 60_000
 
   setup do
-    original = Application.get_env(:ash_metrics, Otel)
-
-    on_exit(fn ->
-      case original do
-        nil -> Application.delete_env(:ash_metrics, Otel)
-        value -> Application.put_env(:ash_metrics, Otel, value)
-      end
-    end)
-
-    %{backlog: %{Info.metric!(Job, :backlog) | strategy: Strategy, period: @period}}
+    %{backlog: %{Info.metric!(Job, :backlog) | period: @period}}
   end
 
   describe "transform_metrics/2" do
@@ -130,12 +80,6 @@ defmodule AshMetrics.Backend.OtelTest do
     end
   end
 
-  describe "polls_gauges?/0" do
-    test "is true" do
-      assert Otel.polls_gauges?()
-    end
-  end
-
   describe "child_spec/1" do
     test "registers every declared gauge against the noop meter" do
       start_supervised!({Otel, gauges: Poller.gauges()})
@@ -155,48 +99,29 @@ defmodule AshMetrics.Backend.OtelTest do
     end
   end
 
-  describe "observe/1" do
+  describe "report_gauge/3" do
     setup do
       start_supervised!({Otel, gauges: []})
 
       :ok
     end
 
-    test "counts the gauge and returns one observation per group", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 3}, {%{status: :processing}, 1}]}])
+    test "is served by the next observation", %{backlog: backlog} do
+      assert Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}]) == :ok
 
-      assert Enum.sort(Otel.observe({Job, backlog})) == [
-               {1, %{status: :processing}},
-               {3, %{status: :pending}}
-             ]
-    end
-
-    test "serves the last count within the gauge's period", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 3}]}, {:ok, [{%{status: :pending}, 9}]}])
-
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
       assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
     end
 
-    test "counts again once the period has passed", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 3}]}, {:ok, [{%{status: :pending}, 9}]}])
-
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
-
-      age(backlog, @period)
+    test "replaces what the last report left", %{backlog: backlog} do
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}])
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 9}])
 
       assert Otel.observe({Job, backlog}) == [{9, %{status: :pending}}]
     end
 
     test "reports a group that has vanished as a zero", %{backlog: backlog} do
-      canned([
-        {:ok, [{%{status: :pending}, 3}, {%{status: :processing}, 1}]},
-        {:ok, [{%{status: :pending}, 3}]}
-      ])
-
-      assert length(Otel.observe({Job, backlog})) == 2
-
-      age(backlog, @period)
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}, {%{status: :processing}, 1}])
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}])
 
       assert Enum.sort(Otel.observe({Job, backlog})) == [
                {0, %{status: :processing}},
@@ -205,38 +130,34 @@ defmodule AshMetrics.Backend.OtelTest do
     end
 
     test "keeps reporting a vanished group as a zero", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 1}]}, {:ok, []}])
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 1}])
+      Otel.report_gauge(Job, backlog, [])
 
-      assert Otel.observe({Job, backlog}) == [{1, %{status: :pending}}]
-
-      age(backlog, @period)
       assert Otel.observe({Job, backlog}) == [{0, %{status: :pending}}]
 
-      age(backlog, @period)
+      Otel.report_gauge(Job, backlog, [])
+
       assert Otel.observe({Job, backlog}) == [{0, %{status: :pending}}]
     end
 
-    test "returns nothing for a first count with no groups", %{backlog: backlog} do
-      canned([{:ok, []}])
+    test "serves nothing for a first report with no groups", %{backlog: backlog} do
+      Otel.report_gauge(Job, backlog, [])
 
       assert Otel.observe({Job, backlog}) == []
     end
 
     test "converts every tag value to an attribute value", %{backlog: backlog} do
-      canned([
-        {:ok,
-         [
-           {%{
-              status: :pending,
-              provider: "ses",
-              attempts: 2,
-              retried: true,
-              missing: nil,
-              actor: %URI{host: "example.com"},
-              window: {1, 2}
-            }, 1}
-         ]}
-      ])
+      tags = %{
+        status: :pending,
+        provider: "ses",
+        attempts: 2,
+        retried: true,
+        missing: nil,
+        actor: %URI{host: "example.com"},
+        window: {1, 2}
+      }
+
+      Otel.report_gauge(Job, backlog, [{tags, 1}])
 
       assert [{1, attributes}] = Otel.observe({Job, backlog})
 
@@ -249,69 +170,51 @@ defmodule AshMetrics.Backend.OtelTest do
                window: "{1, 2}"
              }
     end
+  end
 
-    test "keeps the previous observations when the count fails", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 3}]}, {:error, :no_database}])
+  describe "report_gauge/3 without the backend running" do
+    test "logs an error and reports nothing", %{backlog: backlog} do
+      log = capture_log(fn -> assert Otel.report_gauge(Job, backlog, []) == :ok end)
 
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
-
-      age(backlog, @period)
-
-      log =
-        capture_log(fn -> assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}] end)
-
-      assert log =~ "could not count the gauge :backlog"
-      assert log =~ ":no_database"
-    end
-
-    test "keeps the previous observations when the count raises", %{backlog: backlog} do
-      canned([{:ok, [{%{status: :pending}, 3}]}])
-
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
-
-      raising = %{backlog | strategy: Raising}
-      age(backlog, @period)
-
-      log =
-        capture_log(fn -> assert Otel.observe({Job, raising}) == [{3, %{status: :pending}}] end)
-
-      assert log =~ "no database"
-    end
-
-    test "keeps the previous observations when the count overruns the timeout", %{
-      backlog: backlog
-    } do
-      Application.put_env(:ash_metrics, Otel, timeout: 50)
-      canned([{:ok, [{%{status: :pending}, 3}]}])
-
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
-
-      sleeping = %{backlog | strategy: Sleeping}
-      age(backlog, @period)
-
-      log =
-        capture_log(fn -> assert Otel.observe({Job, sleeping}) == [{3, %{status: :pending}}] end)
-
-      assert log =~ "{:timeout, 50}"
-    end
-
-    test "counts again after a failure", %{backlog: backlog} do
-      canned([{:error, :no_database}, {:ok, [{%{status: :pending}, 3}]}])
-
-      assert capture_log(fn -> assert Otel.observe({Job, backlog}) == [] end) =~ ":no_database"
-      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
+      assert log =~ "AshMetrics.Backend.Otel is not running"
+      assert log =~ ":backlog"
+      assert :ets.whereis(Otel) == :undefined
     end
   end
 
-  defp canned(results) do
-    start_supervised!(%{id: Strategy, start: {Strategy, :start_link, [results]}})
+  describe "observe/1" do
+    setup do
+      start_supervised!({Otel, gauges: []})
+
+      :ok
+    end
+
+    test "is empty for a gauge nothing has reported", %{backlog: backlog} do
+      assert Otel.observe({Job, backlog}) == []
+    end
+
+    test "serves the last report for twice the gauge's period", %{backlog: backlog} do
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}])
+
+      age(backlog, 2 * @period - 1)
+
+      assert Otel.observe({Job, backlog}) == [{3, %{status: :pending}}]
+    end
+
+    test "is empty once twice the gauge's period has passed", %{backlog: backlog} do
+      Otel.report_gauge(Job, backlog, [{%{status: :pending}, 3}])
+
+      age(backlog, 2 * @period)
+
+      assert Otel.observe({Job, backlog}) == []
+    end
   end
 
-  # Backdates the last count by `age` milliseconds, so that the next
-  # observation counts again rather than serving it.
+  # Backdates the last report by `age` milliseconds, so that the observations
+  # it left are that much older than the gauge's period.
   defp age(gauge, age) do
-    [{key, counted_at, observations, known}] = :ets.lookup(Otel, {Job, gauge.name})
+    [{key, reported_at, observations, known}] = :ets.lookup(Otel, {Job, gauge.name})
 
-    :ets.insert(Otel, {key, counted_at - age, observations, known})
+    :ets.insert(Otel, {key, reported_at - age, observations, known})
   end
 end

@@ -417,9 +417,7 @@ defmodule AshMetrics do
   the default backend still gets the poller's process, which sits idle.
 
   A `:poll` option overrides `AshMetrics.Config.poll?/0`, and is not passed
-  on; `false` leaves out every poller's children. A backend that reports the
-  gauges itself leaves them out whatever the option says; see
-  `c:AshMetrics.Backend.polls_gauges?/0`.
+  on; `false` leaves out every poller's children.
 
   `AshMetrics.Supervisor` supervises exactly this, for an application that
   would rather add one child than splice a list.
@@ -428,8 +426,7 @@ defmodule AshMetrics do
   def child_specs(opts \\ []) do
     {poll?, opts} = Keyword.pop(opts, :poll, Config.poll?())
 
-    Backend.child_specs(opts) ++
-      poller_child_specs(poll? and not Backend.polls_gauges?(), opts)
+    Backend.child_specs(opts) ++ poller_child_specs(poll?, opts)
   end
 
   @spec poller_child_specs(boolean(), keyword()) :: [Supervisor.child_spec()]
