@@ -1,12 +1,13 @@
 defmodule AshMetrics.Gauge.Runner do
   @moduledoc """
-  Polls one gauge once and emits one measurement per group.
+  Polls one gauge once, with or without emitting the result.
 
   A poll asks the gauge's `AshMetrics.Gauge.Strategy` for the current value of
-  every group, executes one `:telemetry` event per group, and reports which
-  groups were found. An `AshMetrics.Poller` decides *when* to poll and calls
-  this module; call it by hand from a test, an IEx session, or an application
-  that schedules gauges itself.
+  every group. `poll/2` returns those values; `emit/3` executes one
+  `:telemetry` event per group as well and reports which groups were found. An
+  `AshMetrics.Poller` decides *when* to poll and calls this module; call it by
+  hand from a test, an IEx session, or an application that schedules gauges
+  itself.
 
   ## Multitenancy
 
@@ -40,9 +41,31 @@ defmodule AshMetrics.Gauge.Runner do
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Gauge
+  alias AshMetrics.Gauge.Strategy
 
   @typedoc "Groups emitted by an earlier poll, to be zeroed when they vanish."
   @type known_groups :: [AshMetrics.tags()] | MapSet.t(AshMetrics.tags())
+
+  @typep collected :: {:ok, [Strategy.group()]} | {:error, term(), [Strategy.group()]}
+
+  @doc """
+  Polls `gauge` on `resource` and returns one value per group.
+
+  Returns `{:ok, groups}`, each group a `{tags, value}` tuple tagged as the
+  resource's multitenancy case dictates, or `{:error, reason}` from the
+  gauge's strategy. Nothing is emitted and no group is zeroed; `emit/3` does
+  both.
+
+  Errors are returned rather than raised, but a strategy that raises is not
+  caught here.
+  """
+  @spec poll(module(), Gauge.t()) :: {:ok, [Strategy.group()]} | {:error, term()}
+  def poll(resource, %Gauge{} = gauge) do
+    case collect(resource, gauge) do
+      {:ok, groups} -> {:ok, groups}
+      {:error, error, _computed} -> {:error, error}
+    end
+  end
 
   @doc """
   Polls `gauge` on `resource` and emits one measurement per group.
@@ -64,44 +87,47 @@ defmodule AshMetrics.Gauge.Runner do
   @spec emit(module(), Gauge.t(), known_groups()) ::
           {:ok, [AshMetrics.tags()]} | {:error, term()}
   def emit(resource, %Gauge{} = gauge, known_groups \\ []) do
-    case poll(resource, gauge) do
+    case collect(resource, gauge) do
       {:ok, groups} ->
-        zero_vanished(resource, gauge, groups, known_groups)
+        emitted = execute_all(resource, gauge, groups)
+        zero_vanished(resource, gauge, emitted, known_groups)
 
-        {:ok, groups}
+        {:ok, emitted}
 
-      {:error, error} ->
+      {:error, error, computed} ->
+        execute_all(resource, gauge, computed)
+
         {:error, error}
     end
   end
 
-  @spec poll(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
-  defp poll(resource, %Gauge{} = gauge) do
+  @spec collect(module(), Gauge.t()) :: collected()
+  defp collect(resource, %Gauge{} = gauge) do
     case ResourceInfo.multitenancy_strategy(resource) do
       nil -> compute(resource, gauge, gauge, nil, &Function.identity/1)
-      :attribute -> poll_attribute(resource, gauge)
-      :context -> poll_per_tenant(resource, gauge)
+      :attribute -> collect_attribute(resource, gauge)
+      :context -> collect_per_tenant(resource, gauge)
     end
   end
 
-  @spec poll_attribute(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
-  defp poll_attribute(resource, %Gauge{} = gauge) do
+  @spec collect_attribute(module(), Gauge.t()) :: collected()
+  defp collect_attribute(resource, %Gauge{} = gauge) do
     if ResourceInfo.multitenancy_global?(resource) do
       attribute = ResourceInfo.multitenancy_attribute(resource)
       grouped = %{gauge | group_by: group_by(gauge, attribute)}
 
       compute(resource, gauge, grouped, nil, &as_tenant(&1, attribute, gauge.group_by))
     else
-      poll_per_tenant(resource, gauge)
+      collect_per_tenant(resource, gauge)
     end
   end
 
-  @spec poll_per_tenant(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
-  defp poll_per_tenant(resource, %Gauge{} = gauge) do
+  @spec collect_per_tenant(module(), Gauge.t()) :: collected()
+  defp collect_per_tenant(resource, %Gauge{} = gauge) do
     Enum.reduce_while(Config.tenant_source!().list_tenants(), {:ok, []}, fn tenant, {:ok, all} ->
       case compute(resource, gauge, gauge, tenant, &Map.put(&1, :tenant, tenant)) do
         {:ok, groups} -> {:cont, {:ok, all ++ groups}}
-        {:error, error} -> {:halt, {:error, error}}
+        {:error, error, _computed} -> {:halt, {:error, error, all}}
       end
     end)
   end
@@ -115,15 +141,14 @@ defmodule AshMetrics.Gauge.Runner do
           Gauge.t(),
           term(),
           (AshMetrics.tags() -> AshMetrics.tags())
-        ) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
+        ) :: collected()
   defp compute(resource, %Gauge{} = gauge, %Gauge{} = queried, tenant, tags) do
     case Gauge.strategy_module(gauge).compute(resource, queried, tenant: tenant) do
       {:ok, groups} ->
-        {:ok,
-         Enum.map(groups, fn {group, value} -> execute(resource, gauge, tags.(group), value) end)}
+        {:ok, Enum.map(groups, fn {group, value} -> {tags.(group), value} end)}
 
       {:error, error} ->
-        {:error, error}
+        {:error, error, []}
     end
   end
 
@@ -138,6 +163,11 @@ defmodule AshMetrics.Gauge.Runner do
     tags = if attribute in declared, do: tags, else: Map.delete(tags, attribute)
 
     Map.put(tags, :tenant, tenant)
+  end
+
+  @spec execute_all(module(), Gauge.t(), [Strategy.group()]) :: [AshMetrics.tags()]
+  defp execute_all(resource, gauge, groups) do
+    Enum.map(groups, fn {tags, value} -> execute(resource, gauge, tags, value) end)
   end
 
   @spec zero_vanished(module(), Gauge.t(), [AshMetrics.tags()], known_groups()) :: :ok

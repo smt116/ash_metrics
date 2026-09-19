@@ -74,6 +74,48 @@ defmodule AshMetrics.Gauge.RunnerTest do
     :ok
   end
 
+  describe "poll/2" do
+    test "returns one value per group and emits nothing", %{backlog: backlog} do
+      seed(Job, status: :pending, provider: "ses")
+      seed(Job, status: :pending, provider: "ses")
+      seed(Job, status: :processing, provider: "smtp")
+
+      assert {:ok, groups} = Runner.poll(Job, backlog)
+
+      assert Enum.sort(groups) == [
+               {%{provider: "ses", status: :pending}, 2},
+               {%{provider: "smtp", status: :processing}, 1}
+             ]
+
+      assert emitted(Job, :backlog) == []
+    end
+
+    test "tags every tenant of a resource polled per tenant" do
+      backlog = Info.metric!(SchemaJob, :backlog)
+
+      seed(SchemaJob, [status: :pending], "tenant_a")
+      seed(SchemaJob, [status: :pending], "tenant_b")
+
+      assert {:ok, groups} = Runner.poll(SchemaJob, backlog)
+
+      assert Enum.sort(groups) == [
+               {%{status: :pending, tenant: "tenant_a"}, 1},
+               {%{status: :pending, tenant: "tenant_b"}, 1}
+             ]
+    end
+
+    test "returns the error of a failing strategy", %{backlog: backlog} do
+      assert Runner.poll(Job, %{backlog | strategy: Failing}) == {:error, :no_database}
+    end
+
+    test "returns the error without the tenants that succeeded" do
+      backlog = %{Info.metric!(SchemaJob, :backlog) | strategy: FailingForOneTenant}
+
+      assert Runner.poll(SchemaJob, backlog) == {:error, {:unreachable, "tenant_b"}}
+      assert emitted(SchemaJob, :backlog) == []
+    end
+  end
+
   describe "emit/3 without multitenancy" do
     test "emits one value per group and returns the groups", %{backlog: backlog} do
       seed(Job, status: :pending, provider: "ses")
