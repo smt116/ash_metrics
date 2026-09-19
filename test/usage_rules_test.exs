@@ -33,6 +33,9 @@ defmodule AshMetrics.UsageRulesTest do
   # `AshMetrics.increment_on_change/2` and `AshMetrics.observe_elapsed/2`.
   @change_options [:attribute, :counter, :distribution, :from, :to]
 
+  # Keys of a `tags` entry declaring a path into the written record.
+  @tag_options [:path, :values]
+
   # Option names that belong to neither the DSL nor `AshMetrics.Config`:
   #
   # * `where` is Ash's own option on a `change` declaration.
@@ -176,7 +179,7 @@ defmodule AshMetrics.UsageRulesTest do
 
     Enum.uniq(
       Keyword.keys(section.schema) ++
-        entities ++ config_keys() ++ @change_options ++ @allowed_options
+        entities ++ config_keys() ++ @change_options ++ @tag_options ++ @allowed_options
     )
   end
 

@@ -62,6 +62,23 @@ tags: [:provider, :template, status: [:queued, :sent, :error]]
 tags: [{:status, [:queued, :sent, :error]}, :provider, :template]
 ```
 
+An entry written `key: [path: [...]]` says where in the written record the
+action changes read the tag's value, descending through embedded attributes.
+Add `values:` to close it as well:
+
+```elixir
+tags: [
+  state: [path: [:location, :state]],
+  shipping_state: [path: [:location, :shipping_address, :state], values: [:tx, :ca]]
+]
+```
+
+The key is the tag's name, not an attribute name: name it for the dimension
+it reports. `nil` at any segment of the path leaves the tag off the emission.
+A call site passing that key to `AshMetrics.increment/3` or
+`AshMetrics.observe/4` by hand passes the value itself; the path is read only
+by the action changes.
+
 A gauge has no `tags:`. Its tags are its `group_by:` attributes; see
 `usage-rules/gauges.md`.
 

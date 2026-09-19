@@ -14,8 +14,9 @@ defmodule AshMetrics.Dsl.Distribution do
   `suffix` is the last segment of the metric name; `default_suffix/1` derives
   it from `unit` when the declaration gives none.
 
-  `tags` holds every declared tag key in declaration order and `tag_values` the
-  declared values of the closed ones; see `AshMetrics.Dsl.Tags`.
+  `tags` holds every declared tag key in declaration order, `tag_values` the
+  declared values of the closed ones and `tag_paths` the declared path of
+  those read from the written record; see `AshMetrics.Dsl.Tags`.
   """
 
   alias AshMetrics.Dsl.Tags
@@ -28,6 +29,7 @@ defmodule AshMetrics.Dsl.Distribution do
     unit: :unit,
     tags: [],
     tag_values: %{},
+    tag_paths: %{},
     __spark_metadata__: nil
   ]
 
@@ -41,6 +43,7 @@ defmodule AshMetrics.Dsl.Distribution do
           suffix: atom() | nil,
           tags: [atom()],
           tag_values: %{optional(atom()) => [atom()]},
+          tag_paths: %{optional(atom()) => [atom(), ...]},
           description: String.t() | nil,
           __spark_metadata__: Spark.Dsl.Entity.spark_meta() | nil
         }
@@ -84,13 +87,14 @@ defmodule AshMetrics.Dsl.Distribution do
   @doc false
   @spec transform(t()) :: {:ok, t()}
   def transform(%__MODULE__{} = distribution) do
-    {keys, values} = Tags.normalize(distribution.tags)
+    {keys, values, paths} = Tags.normalize(distribution.tags)
 
     {:ok,
      %{
        distribution
        | tags: keys,
          tag_values: values,
+         tag_paths: paths,
          suffix: distribution.suffix || default_suffix(distribution.unit)
      }}
   end

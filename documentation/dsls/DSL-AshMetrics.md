@@ -127,6 +127,14 @@ every emission must carry it, with one of them, and one metric name carries
 the whole enumeration. An entry written `key` is open, and a call site may
 pass any value or none at all.
 
+An entry written `key: [path: [...]]`, optionally with `values:` closing it
+too, declares where in the written record the action changes read the tag's
+value: `path: [:location, :state]` reads the `state` of the record's
+embedded `location`, and `nil` at any segment leaves the tag off the
+emission. The key is the tag's name and need not be an attribute of the
+resource; a call site passing the tag by hand passes the value itself. See
+`AshMetrics.Dsl.Tags`.
+
 
 
 
@@ -143,6 +151,13 @@ end
 
 ```
 
+```
+counter :placement do
+  tags [state: [path: [:location, :state]], status: [:placed, :shipped]]
+end
+
+```
+
 
 
 ### Arguments
@@ -154,7 +169,7 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`tags`](#metrics-counter-tags){: #metrics-counter-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this counter accepts at the call site. An entry with a list of values closes the tag to them and requires it on every emission. |
+| [`tags`](#metrics-counter-tags){: #metrics-counter-tags } | `list(atom \| {atom, list(atom)} \| {atom, [path: list(atom), values: list(atom)]})` | `[]` | The tag keys this counter accepts at the call site. An entry with a list of values closes the tag to them and requires it on every emission; an entry with a `path:` is read from the written record by the action changes. |
 | [`description`](#metrics-counter-description){: #metrics-counter-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 
 
@@ -247,7 +262,9 @@ The last segment of the metric name is `suffix`, which
 declaration gives none.
 
 As with counters, `tags` is an allowlist of the keys a call site may pass,
-and an entry written `key: [value, ...]` closes the tag to those values.
+an entry written `key: [value, ...]` closes the tag to those values, and an
+entry written `key: [path: [...]]` declares where in the written record
+`AshMetrics.Changes.ObserveElapsed` reads it. See `AshMetrics.Dsl.Tags`.
 
 
 
@@ -281,7 +298,7 @@ end
 | [`unit`](#metrics-distribution-unit){: #metrics-distribution-unit } | `atom \| {atom, atom}` | `:unit` | The unit of the observed value, or a `Telemetry.Metrics` conversion tuple such as `{:native, :millisecond}`. |
 | [`buckets`](#metrics-distribution-buckets){: #metrics-distribution-buckets } | `list(number)` |  | Histogram bucket boundaries, strictly ascending and positive. Passed to the reporter as `reporter_options[:buckets]`. |
 | [`suffix`](#metrics-distribution-suffix){: #metrics-distribution-suffix } | `atom` |  | The last segment of the metric name, a single segment holding no dot. Defaults to what `AshMetrics.Dsl.Distribution.default_suffix/1` derives from `unit`. |
-| [`tags`](#metrics-distribution-tags){: #metrics-distribution-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this distribution accepts at the call site. An entry with a list of values closes the tag to them and requires it on every observation. |
+| [`tags`](#metrics-distribution-tags){: #metrics-distribution-tags } | `list(atom \| {atom, list(atom)} \| {atom, [path: list(atom), values: list(atom)]})` | `[]` | The tag keys this distribution accepts at the call site. An entry with a list of values closes the tag to them and requires it on every observation; an entry with a `path:` is read from the written record by `AshMetrics.Changes.ObserveElapsed`. |
 | [`description`](#metrics-distribution-description){: #metrics-distribution-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 
 

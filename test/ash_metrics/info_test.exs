@@ -10,6 +10,7 @@ defmodule AshMetrics.InfoTest do
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.MarkedJob
   alias AshMetrics.Test.MarkerPoller
+  alias AshMetrics.Test.Order
   alias AshMetrics.Test.Plain
   alias AshMetrics.Test.Shipment
   alias AshMetrics.Test.Ticket
@@ -47,16 +48,56 @@ defmodule AshMetrics.InfoTest do
 
     test "defaults tags to an empty list and description to nil" do
       assert [
-               %Counter{name: :capture, tags: [], tag_values: %{}, description: nil},
+               %Counter{
+                 name: :capture,
+                 tags: [],
+                 tag_values: %{},
+                 tag_paths: %{},
+                 description: nil
+               },
                %Distribution{
                  name: :settlement_lag,
                  unit: :unit,
                  buckets: nil,
                  tags: [],
                  tag_values: %{},
+                 tag_paths: %{},
                  description: nil
                }
              ] = Info.metrics(Invoice)
+    end
+
+    test "normalizes the tags that declare a path into the written record" do
+      assert %Counter{} = counter = Info.metric!(Order, :placements)
+
+      assert counter.tags == [:state, :shipping_state, :status]
+      assert counter.tag_values == %{status: [:placed, :shipped]}
+
+      assert counter.tag_paths == %{
+               state: [:location, :state],
+               shipping_state: [:location, :shipping_address, :state]
+             }
+    end
+
+    test "normalizes a path tag that is closed as well" do
+      assert %Counter{} = counter = Info.metric!(Order, :dispatches)
+
+      assert counter.tags == [:status, :state]
+      assert counter.tag_values == %{status: [:placed, :shipped], state: [:tx, :ca]}
+      assert counter.tag_paths == %{state: [:location, :state]}
+    end
+
+    test "normalizes a path tag of a distribution" do
+      assert %Distribution{} = distribution = Info.metric!(Order, :fulfillment_time)
+
+      assert distribution.tags == [:state]
+      assert distribution.tag_values == %{}
+      assert distribution.tag_paths == %{state: [:location, :state]}
+    end
+
+    test "reads a list of values as a closed tag rather than a path" do
+      assert %Counter{tag_paths: %{}} = Info.metric!(Shipment, :dispatch)
+      assert %Distribution{tag_paths: %{}} = Info.metric!(Shipment, :transit_time)
     end
 
     test "derives a distribution's suffix from its unit" do

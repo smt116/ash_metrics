@@ -12,5 +12,6 @@ defmodule AshMetrics.Test.Queue do
     resource AshMetrics.Test.MarkedJob
     resource AshMetrics.Test.ObanJob
     resource AshMetrics.Test.Ticket
+    resource AshMetrics.Test.Order
   end
 end
