@@ -14,7 +14,7 @@ sent, invoices captured, syncs completed), the current depth of state-machine
 backlogs (how many records are `pending` right now), and latency
 distributions. Declarations sit next to the action they describe, are validated
 at compile time, carry a uniform set of tags without every call site repeating
-them, and enforce a tag allowlist that keeps high-cardinality values out.
+them, and allowlist tag keys, closing any tag to an enumerated set of values.
 
 Those declarations compile into a list of `Telemetry.Metrics` structs, which the
 host application's existing reporter ships to whatever backend it already uses —
@@ -222,9 +222,12 @@ update :record_attempt do
 end
 ```
 
-Two caveats. A value outside a closed tag's declared set is skipped, so a
-status the counter does not enumerate is not counted and nothing is raised.
-And `increment_on_change/2` refuses to run atomically: the action needs
+Three caveats. An open tag that names an attribute, or declares a `path:`, is
+read off the written record and carries whatever the row holds, one timeseries
+per distinct value; name a bounded attribute or close the tag with `values:`.
+A value outside a closed tag's declared set is skipped, so a status the
+counter does not enumerate is not counted and nothing is raised. And
+`increment_on_change/2` refuses to run atomically: the action needs
 `require_atomic? false`, and `Ash.bulk_update/4` needs `:stream` among its
 strategies, or it emits nothing and returns
 `Ash.Error.Invalid.NoMatchingBulkStrategy`. `increment_on_write/2` and

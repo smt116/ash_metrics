@@ -95,6 +95,10 @@ one or the other, or no emission from a change could ever carry it, and a
 verifier rejects the resource. A tag whose value on the record is `nil`, a
 map or a struct is left off the emission.
 
+An open tag filled this way carries whatever the row holds, one timeseries
+per distinct value. Name a bounded attribute, or close it with `values:`;
+never an identifier, a free-text column or anything a user typed.
+
 Never count an action returning `{:ok, _}` as a business outcome. An ok tuple
 means the function returned; the email being delivered, the invoice being
 captured or the sync completing is a fact that usually arrives later, in a

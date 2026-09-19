@@ -42,6 +42,10 @@ defmodule AshMetrics.Dsl.Tags do
   The tag is left off the emission when a segment of the walk is `nil`, and
   when the value the walk arrives at is a map or a struct.
 
+  An open tag read this way carries whatever the row holds, one timeseries
+  per distinct value. Name a bounded attribute, or close the tag with
+  `values:`; a free-text or user-entered attribute is neither.
+
   `AshMetrics.Verifiers.VerifyMetrics` checks a path against the resource's
   attributes while it compiles.
   """
