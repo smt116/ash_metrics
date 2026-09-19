@@ -7,11 +7,11 @@ defmodule AshMetrics.Poller.AshOban.Emit do
   option. There is nothing to call here by hand: `AshMetrics.Gauge.Runner` is
   the way to poll a gauge from code.
 
-  An error is returned rather than swallowed, so that `Ash.run_action!/1`
-  inside AshOban's worker raises and the poll shows up as a failed Oban job.
+  A failed poll returns its error; `Ash.run_action!/1` inside AshOban's worker
+  raises on it and the poll shows up as a failed Oban job.
 
   The groups each poll found are handed to `AshMetrics.Poller.AshOban.Memory`,
-  so that the next poll can zero the ones that have drained. A failed poll
+  from which the next poll zeroes the ones that have drained. A failed poll
   leaves that memory untouched.
   """
 

@@ -84,8 +84,8 @@ defmodule AshMetrics.Poller.GenServer do
   defp schedule(index, period), do: Process.send_after(self(), {:poll, index}, period)
 
   # Returns the groups to remember: the ones this poll found, or the ones the
-  # last successful poll found when it failed, so that a group is still zeroed
-  # once it vanishes even if a poll was lost in between.
+  # last successful poll found when it failed. A group is zeroed once it
+  # vanishes even if a poll was lost in between.
   @spec poll(module(), Gauge.t(), [AshMetrics.tags()]) :: [AshMetrics.tags()]
   defp poll(resource, gauge, known_groups) do
     case Runner.emit(resource, gauge, known_groups) do

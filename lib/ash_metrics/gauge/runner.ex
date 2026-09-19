@@ -90,8 +90,8 @@ defmodule AshMetrics.Gauge.Runner do
   and a failed poll reports nothing at all, not even the groups computed
   before the error. The return value is the same either way.
 
-  Errors are returned rather than raised, but a strategy that raises is not
-  caught here; `AshMetrics.Poller.GenServer` is what keeps a raising strategy
+  An error the strategy returns is returned; an exception it raises is not
+  caught here. `AshMetrics.Poller.GenServer` is what keeps a raising strategy
   from taking a poller down.
   """
   @spec emit(module(), Gauge.t(), known_groups()) ::

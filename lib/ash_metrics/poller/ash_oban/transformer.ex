@@ -18,9 +18,7 @@ defmodule AshMetrics.Poller.AshOban.Transformer do
   Two things can be wrong with such a gauge: the resource may not use the
   `AshOban` extension, leaving no `[:oban, :scheduled_actions]` to add an entry
   to, and the `period` may be one cron cannot express, leaving no entry to add.
-  Either is a compile error rather than the warning a verifier would report.
-  Both are checked here rather than in a verifier, which would run after every
-  transformer.
+  Either is a compile error naming the gauge, not a compiler warning.
 
   It runs before AshOban's own SetDefaults transformer, which resolves a
   scheduled action's queue and checks that the action it names exists;
