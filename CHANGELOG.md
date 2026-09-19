@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-19
+
 ### Added
 
 - `c:AshMetrics.Backend.report_gauge/3`, an optional callback that takes the
@@ -104,6 +106,7 @@ and this project adheres to
   `mix igniter.install ash_metrics`, which writes the configuration and wires
   the metrics into the host application's reporter and supervision tree.
 
-[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/smt116/ash_metrics/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/smt116/ash_metrics/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/smt116/ash_metrics/releases/tag/v0.1.0

@@ -51,7 +51,7 @@ no telemetry module. See `mix ash_metrics.install`.
 To install by hand, add the dependency:
 
 ```elixir
-{:ash_metrics, "~> 0.2"}
+{:ash_metrics, "~> 0.3"}
 ```
 
 Then write the configuration block below and wire the metrics into your

@@ -2,7 +2,7 @@ defmodule AshMetrics.MixProject do
   use Mix.Project
 
   @description "Declarative business metrics DSL for Ash resources, compiled to Telemetry.Metrics definitions."
-  @version "0.2.0"
+  @version "0.3.0"
   @source_url "https://github.com/smt116/ash_metrics"
 
   def project do
