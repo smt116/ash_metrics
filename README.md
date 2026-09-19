@@ -53,7 +53,7 @@ reporter snippet to add by hand when it finds no telemetry module. See
 To install by hand, add the dependency:
 
 ```elixir
-{:ash_metrics, "~> 0.3"}
+{:ash_metrics, "~> 0.4"}
 ```
 
 Then write the configuration block below and wire the metrics into your
