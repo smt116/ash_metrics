@@ -43,6 +43,12 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
                            "    [{:ash_oban, \"~> 0.8\"}]\n"
                          )
 
+  @mix_exs_with_otel String.replace(
+                       @mix_exs,
+                       "    []\n",
+                       "    [{:otel_telemetry_metrics, \"~> 0.1\"}]\n"
+                     )
+
   @application """
   defmodule Test.Application do
     @moduledoc false
@@ -208,6 +214,31 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
       refute Enum.any?(
                igniter.notices,
                &String.contains?(&1, "AshMetrics.Poller.AshOban")
+             )
+    end
+  end
+
+  describe "the OpenTelemetry backend" do
+    test "is pointed at when the application depends on otel_telemetry_metrics" do
+      igniter =
+        %{"mix.exs" => @mix_exs_with_otel}
+        |> phoenix_shaped_project()
+        |> install()
+
+      assert_has_notice(
+        igniter,
+        &String.contains?(&1, "config :ash_metrics, backend: AshMetrics.Backend.Otel")
+      )
+
+      assert_has_notice(igniter, &String.contains?(&1, "timeout: 5_000"))
+    end
+
+    test "is not mentioned when the application does not depend on otel_telemetry_metrics" do
+      igniter = install(phoenix_shaped_project())
+
+      refute Enum.any?(
+               igniter.notices,
+               &String.contains?(&1, "AshMetrics.Backend.Otel")
              )
     end
   end

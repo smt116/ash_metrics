@@ -101,6 +101,25 @@ if Code.ensure_loaded?(Igniter) do
     See `AshMetrics.Poller.AshOban`.
     """
 
+    # Printed when the application already depends on `otel_telemetry_metrics`.
+    @otel_backend """
+    This application depends on `otel_telemetry_metrics`, so it exports
+    through OpenTelemetry and wants the backend that adapts the metric
+    definitions for that bridge:
+
+        config :ash_metrics, backend: AshMetrics.Backend.Otel
+
+        config :ash_metrics, AshMetrics.Backend.Otel,
+          timeout: 5_000
+
+    Keep splicing `AshMetrics.metrics/0` into the list your own
+    `OtelTelemetryMetrics` instance is given. The backend reports the gauges
+    itself, as OpenTelemetry observable gauges, so do not select
+    `AshMetrics.Poller.AshOban` alongside it.
+
+    See `AshMetrics.Backend.Otel`.
+    """
+
     # Printed when nothing in the application looks like the module a
     # reporter is configured from, which is the case for an application that
     # runs no reporter yet.
@@ -137,12 +156,22 @@ if Code.ensure_loaded?(Igniter) do
       |> supervise()
       |> Igniter.add_notice(@optional_keys)
       |> note_ash_oban_poller()
+      |> note_otel_backend()
     end
 
     @spec note_ash_oban_poller(Igniter.t()) :: Igniter.t()
     defp note_ash_oban_poller(igniter) do
       if ProjectDeps.has_dep?(igniter, :ash_oban) do
         Igniter.add_notice(igniter, @ash_oban_poller)
+      else
+        igniter
+      end
+    end
+
+    @spec note_otel_backend(Igniter.t()) :: Igniter.t()
+    defp note_otel_backend(igniter) do
+      if ProjectDeps.has_dep?(igniter, :otel_telemetry_metrics) do
+        Igniter.add_notice(igniter, @otel_backend)
       else
         igniter
       end
