@@ -40,6 +40,7 @@ if Code.ensure_loaded?(Igniter) do
     alias Igniter.Libs.Ecto, as: EctoLib
     alias Igniter.Project.Application, as: ProjectApplication
     alias Igniter.Project.Config, as: ProjectConfig
+    alias Igniter.Project.Deps, as: ProjectDeps
     alias Igniter.Project.Formatter, as: ProjectFormatter
     alias Igniter.Project.Module, as: ProjectModule
     alias Sourceror.Zipper
@@ -64,6 +65,34 @@ if Code.ensure_loaded?(Igniter) do
     written: it is read while resources compile. `tenant_source` is needed
     only by an application that declares a gauge on a resource which has to be
     polled per tenant.
+    """
+
+    # Printed when the application already depends on `ash_oban`.
+    @ash_oban_poller """
+    This application depends on `ash_oban`, so gauges can be polled from
+    Oban's cron rather than the default timer:
+
+        config :ash_metrics, poller: AshMetrics.Poller.AshOban
+
+    or, for one resource at a time:
+
+        metrics do
+          poller AshMetrics.Poller.AshOban
+        end
+
+    `poller` is read while resources compile, so it belongs in
+    `config/config.exs`. The poller itself takes:
+
+        config :ash_metrics, AshMetrics.Poller.AshOban,
+          queue: :default,
+          max_attempts: 1
+
+    A resource that selects it must use the `AshOban` extension, every gauge's
+    `period` must be a whole number of minutes, hours or one day, and the
+    queue must exist in the Oban configuration built with `AshOban.config/2`
+    with `Oban.Plugins.Cron` enabled, or the schedules are never registered.
+
+    See `AshMetrics.Poller.AshOban`.
     """
 
     # Printed when nothing in the application looks like the module a
@@ -101,6 +130,16 @@ if Code.ensure_loaded?(Igniter) do
       |> add_to_reporter()
       |> supervise()
       |> Igniter.add_notice(@optional_keys)
+      |> note_ash_oban_poller()
+    end
+
+    @spec note_ash_oban_poller(Igniter.t()) :: Igniter.t()
+    defp note_ash_oban_poller(igniter) do
+      if ProjectDeps.has_dep?(igniter, :ash_oban) do
+        Igniter.add_notice(igniter, @ash_oban_poller)
+      else
+        igniter
+      end
     end
 
     # `configure_new/5`, not `configure/6`: a `prefix` an adopter has already

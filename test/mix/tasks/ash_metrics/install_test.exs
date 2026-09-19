@@ -37,6 +37,12 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
   end
   """
 
+  @mix_exs_with_ash_oban String.replace(
+                           @mix_exs,
+                           "    []\n",
+                           "    [{:ash_oban, \"~> 0.8\"}]\n"
+                         )
+
   @application """
   defmodule Test.Application do
     @moduledoc false
@@ -153,6 +159,31 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
       assert_has_notice(igniter, &String.contains?(&1, "backend: AshMetrics.Backend.Noop"))
       assert_has_notice(igniter, &String.contains?(&1, "poller: AshMetrics.Poller.GenServer"))
       assert_has_notice(igniter, &String.contains?(&1, "tenant_source: nil"))
+    end
+  end
+
+  describe "the Oban poller" do
+    test "is pointed at when the application depends on ash_oban" do
+      igniter =
+        %{"mix.exs" => @mix_exs_with_ash_oban}
+        |> phoenix_shaped_project()
+        |> install()
+
+      assert_has_notice(
+        igniter,
+        &String.contains?(&1, "config :ash_metrics, poller: AshMetrics.Poller.AshOban")
+      )
+
+      assert_has_notice(igniter, &String.contains?(&1, "queue: :default"))
+    end
+
+    test "is not mentioned when the application does not depend on ash_oban" do
+      igniter = install(phoenix_shaped_project())
+
+      refute Enum.any?(
+               igniter.notices,
+               &String.contains?(&1, "AshMetrics.Poller.AshOban")
+             )
     end
   end
 
