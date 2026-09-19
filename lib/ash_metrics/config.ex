@@ -112,9 +112,10 @@ defmodule AshMetrics.Config do
   @doc """
   Whether the pollers of the declared gauges are started. Defaults to `true`.
 
-  With `false`, `AshMetrics.child_specs/1` returns no poller's children and no
-  gauge is polled; the backend's children and the compiled metric definitions
-  are the same either way.
+  With `false`, `AshMetrics.child_specs/1` returns no poller's children; the
+  backend's children and the compiled metric definitions are the same either
+  way. A poller that runs no process of its own, such as
+  `AshMetrics.Poller.AshOban`, polls regardless of this key.
 
       config :ash_metrics, poll: false
   """
