@@ -4,10 +4,14 @@ defmodule AshMetrics.Changes.ObserveElapsedTest do
   use ExUnit.Case, async: false
   use AshMetrics.Test, resources: [AshMetrics.Test.Ticket]
 
+  alias Ash.BulkResult
+  alias Ash.Error.Framework
+  alias Ash.Error.Framework.MustBeAtomic
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.Ticket
 
   @metric "test.queue.ticket.time_to_resolve"
+  @counter "test.queue.ticket.transitions"
 
   setup do
     Ets.clear!()
@@ -65,6 +69,55 @@ defmodule AshMetrics.Changes.ObserveElapsedTest do
     assert_in_delta value, 3_000, 1_000
   end
 
+  describe "an action that keeps require_atomic? true" do
+    test "observes from a single update, alongside the counter", %{ticket: ticket} do
+      Ash.update!(
+        ticket,
+        %{status: :resolved, resolved_at: DateTime.add(ticket.inserted_at, 900, :millisecond)},
+        action: :resolve
+      )
+
+      assert_metric_emitted(@metric, value: 900, tags: %{priority: :high})
+      assert_metric_emitted(@counter, tags: %{status: :resolved, assignee: "ana"})
+    end
+
+    test "observes once per record from Ash.bulk_update/4 under its default strategy",
+         %{ticket: ticket} do
+      Ash.create!(Ticket, %{priority: :low, assignee: "bo"}, action: :open)
+      drain()
+
+      assert %BulkResult{status: :success, records: records} =
+               Ash.bulk_update(
+                 Ticket,
+                 :resolve,
+                 %{
+                   status: :resolved,
+                   resolved_at: DateTime.add(ticket.inserted_at, 700, :millisecond)
+                 },
+                 return_records?: true
+               )
+
+      assert length(records) == 2
+
+      assert_metric_emitted(@metric, tags: %{priority: :high})
+      assert_metric_emitted(@metric, tags: %{priority: :low})
+    end
+
+    test "a where: reading an attribute leaves it unable to run", %{ticket: ticket} do
+      assert {:error, %Framework{errors: [%MustBeAtomic{}]}} =
+               Ash.update(
+                 ticket,
+                 %{
+                   status: :resolved,
+                   resolved_at: DateTime.add(ticket.inserted_at, 100, :millisecond)
+                 },
+                 action: :resolve_when_resolved
+               )
+
+      refute_metric_emitted(@metric)
+    end
+  end
+
   defp resolve!(ticket, milliseconds) do
     Ash.update!(
       ticket,
@@ -74,5 +127,15 @@ defmodule AshMetrics.Changes.ObserveElapsedTest do
       },
       action: :update_status
     )
+  end
+
+  # Empties the mailbox of the emissions the seeding produced, so that only
+  # what the action under test emitted is left to assert on.
+  defp drain do
+    receive do
+      {:ash_metrics, _name, _measurements, _tags} -> drain()
+    after
+      0 -> :ok
+    end
   end
 end

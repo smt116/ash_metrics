@@ -34,6 +34,19 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
       assert_metric_emitted(@transitions, tags: %{status: :resolved, assignee: "ana"})
       assert_metric_emitted(@elapsed, value: 2_000, tags: %{priority: :low})
     end
+
+    test "emits both from an action that keeps require_atomic? true" do
+      ticket = open!("ana")
+
+      Ash.update!(
+        ticket,
+        %{status: :resolved, resolved_at: DateTime.add(ticket.inserted_at, 1_000, :millisecond)},
+        action: :resolve
+      )
+
+      assert_metric_emitted(@transitions, tags: %{status: :resolved, assignee: "ana"})
+      assert_metric_emitted(@elapsed, value: 1_000, tags: %{priority: :low})
+    end
   end
 
   describe "Ash.bulk_update/4" do
@@ -71,6 +84,22 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
       assert strategy.not_atomic_reason =~ "strategy: :stream"
 
       refute_metric_emitted(@transitions)
+    end
+
+    test "emits once per record under the default :atomic strategy" do
+      Enum.each(~w(ana bo), &open!/1)
+      drain()
+
+      assert %BulkResult{status: :success, records: records} =
+               Ash.bulk_update(PgTicket, :resolve, %{status: :resolved}, return_records?: true)
+
+      assert length(records) == 2
+
+      Enum.each(~w(ana bo), fn assignee ->
+        assert_metric_emitted(@transitions,
+          tags: %{status: :resolved, priority: :low, assignee: assignee}
+        )
+      end)
     end
 
     test "falls back to streaming when :stream is among the strategies" do

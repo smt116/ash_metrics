@@ -30,10 +30,15 @@ defmodule AshMetrics.Changes.ObserveElapsed do
 
   ## Atomics
 
-  The change measures the resulting record from a hook instead of writing an
-  attribute, so it declares itself non-atomic. The action must set
-  `require_atomic? false`, and `Ash.bulk_update/4` must be given
-  `strategy: :stream`.
+  The change runs atomically: the action can keep `require_atomic? true`, and
+  `Ash.bulk_update/4` can use its `:atomic` strategy.
+
+  A `where:` whose condition reads an attribute, such as `attribute_equals/2`
+  or `data_one_of/2`, cannot be decided before the action runs and takes the
+  action out of the atomic path. That action needs `require_atomic? false`,
+  and `Ash.bulk_update/4` needs `strategy: :stream`; otherwise it fails with
+  `Ash.Error.Framework.MustBeAtomic`. A condition over the action name or an
+  argument leaves the action atomic.
   """
 
   use Ash.Resource.Change
@@ -44,11 +49,6 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   alias AshMetrics.Info
 
   @time_units [:second, :millisecond, :microsecond, :nanosecond]
-
-  @not_atomic "AshMetrics.Changes.ObserveElapsed measures the resulting " <>
-                "record from a hook rather than writing an attribute. Set " <>
-                "`require_atomic? false` on the action, or run a bulk update " <>
-                "with `strategy: :stream`."
 
   @doc """
   Whether `unit` is a unit this change can measure an elapsed time in.
@@ -80,12 +80,12 @@ defmodule AshMetrics.Changes.ObserveElapsed do
 
   @impl Ash.Resource.Change
   @spec atomic(Changeset.t(), keyword(), Ash.Resource.Change.Context.t()) ::
-          {:not_atomic, String.t()}
-  def atomic(_changeset, _opts, _context), do: {:not_atomic, @not_atomic}
+          {:ok, Changeset.t()}
+  def atomic(changeset, opts, context), do: {:ok, change(changeset, opts, context)}
 
   @impl Ash.Resource.Change
-  @spec atomic?() :: false
-  def atomic?, do: false
+  @spec atomic?() :: true
+  def atomic?, do: true
 
   @spec observe(Changeset.t(), keyword(), term()) :: :ok
   defp observe(changeset, opts, {:ok, record}) do

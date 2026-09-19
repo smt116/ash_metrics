@@ -65,5 +65,18 @@ defmodule AshMetrics.Test.PgTicket do
              ),
              where: [attribute_equals(:status, :resolved)]
     end
+
+    # Both atomic-capable changes on one action that keeps Ash's default
+    # `require_atomic? true`.
+    update :resolve do
+      accept [:status, :resolved_at]
+
+      change AshMetrics.increment_on_write(:transitions, :status)
+
+      change AshMetrics.observe_elapsed(:time_to_resolve,
+               from: :inserted_at,
+               to: :resolved_at
+             )
+    end
   end
 end

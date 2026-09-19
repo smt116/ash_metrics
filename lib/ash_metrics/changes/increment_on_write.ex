@@ -19,9 +19,8 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
 
   The change runs atomically: the action can keep `require_atomic? true`, and
   `Ash.bulk_update/4` can use its `:atomic` strategy. A `where:` whose
-  condition Ash cannot resolve before running the action, such as
-  `Ash.Resource.Validation.Builtins.data_one_of/2` reading the original
-  record, makes the action non-atomic again.
+  condition reads an attribute takes the action out of the atomic path; see
+  `AshMetrics.Changes.ObserveElapsed`.
   """
 
   use Ash.Resource.Change

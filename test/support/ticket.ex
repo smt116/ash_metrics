@@ -100,6 +100,31 @@ defmodule AshMetrics.Test.Ticket do
       change AshMetrics.increment_on_write(:transitions, :status)
     end
 
+    # Both atomic-capable changes on one action that keeps Ash's default
+    # `require_atomic? true`.
+    update :resolve do
+      accept [:status, :resolved_at]
+
+      change AshMetrics.increment_on_write(:transitions, :status)
+
+      change AshMetrics.observe_elapsed(:time_to_resolve,
+               from: :inserted_at,
+               to: :resolved_at
+             )
+    end
+
+    # `:resolve` again, with a `where:` reading an attribute, which takes the
+    # action out of the atomic path it did not opt out of.
+    update :resolve_when_resolved do
+      accept [:status, :resolved_at]
+
+      change AshMetrics.observe_elapsed(:time_to_resolve,
+               from: :inserted_at,
+               to: :resolved_at
+             ),
+             where: [attribute_equals(:status, :resolved)]
+    end
+
     # Carries the change while touching another attribute, so that a status
     # that did not move can be shown to emit nothing.
     update :rename do
