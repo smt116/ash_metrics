@@ -38,11 +38,13 @@ defmodule AshMetrics do
         metadata: changeset.context
       )
 
-  When the fact is written by an Ash action, `increment_on_change/2` and
-  `observe_elapsed/2` declare a `change` that emits it from that action.
+  When the fact is written by an Ash action, `increment_on_change/2`,
+  `increment_on_write/2` and `observe_elapsed/2` declare a `change` that emits
+  it from that action.
 
   A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
-  `period` and emits one value per group.
+  `period` and emits one value per group, or the configured `AshMetrics.Backend`
+  counts it itself when it reports gauges.
 
   A host application consumes `metrics/0`, the declarations of every resource
   compiled to `Telemetry.Metrics` definitions, ready to be spliced into
@@ -309,7 +311,7 @@ defmodule AshMetrics do
   must be a time unit; a verifier rejects the resource otherwise.
 
   `AshMetrics.Changes.ObserveElapsed` documents what is observed, when, and
-  why the action needs `require_atomic? false`.
+  which `where:` conditions leave the action atomic.
   """
   @spec observe_elapsed(atom(), keyword()) :: {module(), keyword()}
   def observe_elapsed(metric, opts) do

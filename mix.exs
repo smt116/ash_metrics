@@ -74,6 +74,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Dsl.Distribution,
           AshMetrics.Dsl.Gauge,
           AshMetrics.Dsl.Tags,
+          AshMetrics.Gauge.Runner,
           AshMetrics.Info,
           AshMetrics.Supervisor,
           AshMetrics.Verifiers.VerifyChanges,

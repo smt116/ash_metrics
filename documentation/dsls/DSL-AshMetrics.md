@@ -41,11 +41,13 @@ becomes known:
       metadata: changeset.context
     )
 
-When the fact is written by an Ash action, `increment_on_change/2` and
-`observe_elapsed/2` declare a `change` that emits it from that action.
+When the fact is written by an Ash action, `increment_on_change/2`,
+`increment_on_write/2` and `observe_elapsed/2` declare a `change` that emits
+it from that action.
 
 A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
-`period` and emits one value per group.
+`period` and emits one value per group, or the configured `AshMetrics.Backend`
+counts it itself when it reports gauges.
 
 A host application consumes `metrics/0`, the declarations of every resource
 compiled to `Telemetry.Metrics` definitions, ready to be spliced into
