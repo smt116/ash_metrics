@@ -3,7 +3,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   Checks the `AshMetrics` action changes a resource declares, wherever they
   are declared: in the resource's `changes` block or in an action's.
 
-  For `AshMetrics.Changes.IncrementOnChange` the checks are:
+  For `AshMetrics.Changes.IncrementOnChange` and
+  `AshMetrics.Changes.IncrementOnWrite` the checks are:
 
   * the counter is declared on the resource, and is a counter rather than a
     gauge or a distribution
@@ -28,6 +29,7 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   alias Ash.Resource.Change
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Changes.IncrementOnChange
+  alias AshMetrics.Changes.IncrementOnWrite
   alias AshMetrics.Changes.ObserveElapsed
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
@@ -73,7 +75,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   end
 
   @spec verify_change(map(), source(), Change.t()) :: :ok | {:error, Exception.t()}
-  defp verify_change(dsl_state, source, %Change{change: {IncrementOnChange, opts}} = change) do
+  defp verify_change(dsl_state, source, %Change{change: {module, opts}} = change)
+       when module in [IncrementOnChange, IncrementOnWrite] do
     with {:ok, counter} <- metric(dsl_state, source, change, opts[:counter], Counter),
          :ok <- verify_attribute(dsl_state, source, change, counter, opts[:attribute]),
          do: verify_closed_tags(dsl_state, source, change, counter)
@@ -184,8 +187,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           dsl_state,
           source,
           change,
-          "#{where(source)} counts changes of #{inspect(attribute)}, which is " <>
-            "not an attribute of this resource. Declared attributes: " <>
+          "#{where(source)} counts #{inspect(attribute)}, which is not an " <>
+            "attribute of this resource. Declared attributes: " <>
             attributes(dsl_state)
         )
 
@@ -194,8 +197,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           dsl_state,
           source,
           change,
-          "#{where(source)} counts changes of #{inspect(attribute)} into the " <>
-            "counter #{inspect(counter.name)}, which does not declare " <>
+          "#{where(source)} counts #{inspect(attribute)} into the counter " <>
+            "#{inspect(counter.name)}, which does not declare " <>
             "#{inspect(attribute)} as a tag. Add it to that counter's `tags`. " <>
             "Declared tags: #{list(counter.tags)}"
         )

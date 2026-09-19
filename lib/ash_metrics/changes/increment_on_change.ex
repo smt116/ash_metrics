@@ -34,8 +34,6 @@ defmodule AshMetrics.Changes.IncrementOnChange do
 
   alias Ash.Changeset
   alias AshMetrics.Changes.Emission
-  alias AshMetrics.Dsl.Counter
-  alias AshMetrics.Info
 
   @not_atomic "AshMetrics.Changes.IncrementOnChange compares an attribute " <>
                 "with its original value, which an atomic update does not " <>
@@ -44,12 +42,7 @@ defmodule AshMetrics.Changes.IncrementOnChange do
 
   @impl Ash.Resource.Change
   @spec init(keyword()) :: {:ok, keyword()} | {:error, String.t()}
-  def init(opts) do
-    with {:ok, counter} <- Emission.option(opts, :counter, __MODULE__),
-         {:ok, attribute} <- Emission.option(opts, :attribute, __MODULE__) do
-      {:ok, counter: counter, attribute: attribute}
-    end
-  end
+  def init(opts), do: Emission.counter_options(opts, __MODULE__)
 
   @impl Ash.Resource.Change
   @spec change(Changeset.t(), keyword(), Ash.Resource.Change.Context.t()) :: Changeset.t()
@@ -73,18 +66,13 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   @spec increment(Changeset.t(), keyword(), term()) :: :ok
   defp increment(changeset, opts, {:ok, record}) do
     Emission.emit(changeset, opts[:counter], fn ->
-      counter = Info.metric!(changeset.resource, opts[:counter])
       attribute = opts[:attribute]
-      value = Map.get(record, attribute)
 
-      if changed?(changeset, attribute, value) and declared?(counter, attribute, value) do
-        AshMetrics.increment(changeset.resource, counter.name,
-          tags: tags(changeset.resource, record, counter, attribute, value),
-          metadata: Emission.metadata(changeset)
-        )
+      if changed?(changeset, attribute, Map.get(record, attribute)) do
+        Emission.count(changeset, opts, record)
+      else
+        :ok
       end
-
-      :ok
     end)
   end
 
@@ -95,20 +83,5 @@ defmodule AshMetrics.Changes.IncrementOnChange do
 
   defp changed?(changeset, attribute, value) do
     Changeset.get_data(changeset, attribute) != value
-  end
-
-  @spec declared?(Counter.t(), atom(), term()) :: boolean()
-  defp declared?(counter, attribute, value) do
-    case Map.fetch(counter.tag_values, attribute) do
-      {:ok, values} -> value in values
-      :error -> true
-    end
-  end
-
-  @spec tags(module(), Ash.Resource.record(), Counter.t(), atom(), term()) :: AshMetrics.tags()
-  defp tags(resource, record, counter, attribute, value) do
-    resource
-    |> Emission.attribute_tags(record, counter.tags)
-    |> Map.put(attribute, value)
   end
 end

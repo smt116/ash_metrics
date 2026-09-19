@@ -83,6 +83,7 @@ defmodule AshMetrics.MixProject do
         ],
         "Action changes": [
           AshMetrics.Changes.IncrementOnChange,
+          AshMetrics.Changes.IncrementOnWrite,
           AshMetrics.Changes.ObserveElapsed
         ],
         Behaviours: [

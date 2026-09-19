@@ -26,9 +26,11 @@ defmodule AshMetrics.Test.Ticket do
   attributes do
     uuid_primary_key :id
 
+    # `:archived` is the one status the counter does not enumerate, so that a
+    # write the closed tag excludes can be exercised.
     attribute :status, :atom,
       public?: true,
-      constraints: [one_of: [:open, :in_progress, :resolved, :closed]]
+      constraints: [one_of: [:open, :in_progress, :resolved, :closed, :archived]]
 
     attribute :priority, :atom, public?: true, constraints: [one_of: [:low, :high]]
     attribute :assignee, :string, public?: true
@@ -81,6 +83,21 @@ defmodule AshMetrics.Test.Ticket do
                from: :inserted_at,
                to: :acknowledged_at
              )
+    end
+
+    # Counts every write of the status rather than every change of it.
+    create :submit do
+      accept [:priority, :assignee]
+
+      change set_attribute(:status, :open)
+      change AshMetrics.increment_on_write(:transitions, :status)
+    end
+
+    # Keeps Ash's default `require_atomic? true`.
+    update :write_status do
+      accept [:status]
+
+      change AshMetrics.increment_on_write(:transitions, :status)
     end
 
     # Carries the change while touching another attribute, so that a status

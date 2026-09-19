@@ -50,7 +50,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "counts changes of :state, which is not an attribute"
+      assert message =~ "counts :state, which is not an attribute"
       assert message =~ "Declared attributes: :id, :status"
     end
 
@@ -117,6 +117,68 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
     test "the support resource declares valid changes" do
       assert Compiler.dsl_errors_for(Ticket) == []
+    end
+  end
+
+  describe "increment_on_write/2" do
+    test "the counter must be declared" do
+      assert [%DslError{path: [:actions, :update_status]} = error] =
+               errors(
+                 quote(do: counter(:transitions, tags: [:status])),
+                 quote(do: change(AshMetrics.increment_on_write(:nope, :status)))
+               )
+
+      assert Exception.message(error) =~
+               "action :update_status emits :nope, which this resource does not"
+    end
+
+    test "the metric must be a counter" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote(do: distribution(:transitions)),
+                 quote(do: change(AshMetrics.increment_on_write(:transitions, :status)))
+               )
+
+      assert Exception.message(error) =~
+               "emits :transitions, which is a distribution rather than a counter"
+    end
+
+    test "the counted attribute must be an attribute" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote(do: counter(:transitions, tags: [:state])),
+                 quote(do: change(AshMetrics.increment_on_write(:transitions, :state)))
+               )
+
+      assert Exception.message(error) =~ "counts :state, which is not an attribute"
+    end
+
+    test "the counted attribute must be a tag of the counter" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote(do: counter(:transitions, tags: [:assignee])),
+                 quote(do: change(AshMetrics.increment_on_write(:transitions, :status)))
+               )
+
+      assert Exception.message(error) =~ "does not declare :status as a tag"
+    end
+
+    test "every other closed tag of the counter must name an attribute" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote(do: counter(:transitions, tags: [:status, region: [:eu, :us]])),
+                 quote(do: change(AshMetrics.increment_on_write(:transitions, :status)))
+               )
+
+      assert Exception.message(error) =~
+               "whose closed tag :region is not an attribute of this resource"
+    end
+
+    test "a valid declaration produces no errors" do
+      assert errors(
+               quote(do: counter(:transitions, tags: [:status])),
+               quote(do: change(AshMetrics.increment_on_write(:transitions, :status)))
+             ) == []
     end
   end
 

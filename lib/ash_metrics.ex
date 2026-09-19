@@ -72,6 +72,7 @@ defmodule AshMetrics do
   alias Ash.Domain.Info, as: DomainInfo
   alias AshMetrics.Backend
   alias AshMetrics.Changes.IncrementOnChange
+  alias AshMetrics.Changes.IncrementOnWrite
   alias AshMetrics.Changes.ObserveElapsed
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Counter
@@ -242,12 +243,42 @@ defmodule AshMetrics do
   the emitted tag is what the action wrote. A verifier rejects the resource
   otherwise.
 
+  `increment_on_write/2` counts every write of the attribute instead, and runs
+  atomically.
+
   `AshMetrics.Changes.IncrementOnChange` documents what is emitted, when, and
   why the action needs `require_atomic? false`.
   """
   @spec increment_on_change(atom(), atom()) :: {module(), keyword()}
   def increment_on_change(metric, attribute) do
     {IncrementOnChange, counter: metric, attribute: attribute}
+  end
+
+  @doc """
+  Declares a `change` that counts every write of `attribute` into the counter
+  `metric`.
+
+  Use it on the action that writes the attribute:
+
+      update :update_status do
+        accept [:status]
+
+        change AshMetrics.increment_on_write(:delivery, :status)
+      end
+
+  It counts every `{:ok, record}`, whatever the attribute held before: a
+  create counts, and an update writing the same value again counts again. It
+  runs atomically, so the action can keep `require_atomic? true`.
+
+  The counter must declare `attribute` as one of its `tags`, open or closed;
+  the emitted tag is what the action wrote. A verifier rejects the resource
+  otherwise.
+
+  `AshMetrics.Changes.IncrementOnWrite` documents what is emitted and when.
+  """
+  @spec increment_on_write(atom(), atom()) :: {module(), keyword()}
+  def increment_on_write(metric, attribute) do
+    {IncrementOnWrite, counter: metric, attribute: attribute}
   end
 
   @doc """
