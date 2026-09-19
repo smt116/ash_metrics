@@ -33,14 +33,16 @@ One command does the whole installation:
 mix igniter.install ash_metrics
 ```
 
-It adds the dependency, writes `prefix` and `otp_app` to `config/config.exs`,
-appends `++ AshMetrics.metrics()` to the `metrics/0` of the module that imports
-`Telemetry.Metrics` — `MyAppWeb.Telemetry` in a generated Phoenix application —
-and adds `AshMetrics.Supervisor` to your application's children after the
-repositories. It never overwrites a value you have already chosen, prints the
-optional configuration keys with their defaults, and prints a reporter snippet
-to add by hand when it finds no telemetry module. See
-`mix ash_metrics.install`.
+It adds the dependency, writes `prefix` and `otp_app` to `config/config.exs`
+and `poll: false` to `config/test.exs`, appends `++ AshMetrics.metrics()` to
+the `metrics/0` of the module that imports `Telemetry.Metrics` —
+`MyAppWeb.Telemetry` in a generated Phoenix application — and adds
+`AshMetrics.Supervisor` to your application's children after the repositories.
+It never overwrites a value you have already chosen, prints the optional
+configuration keys with their defaults, prints how to select the Oban poller or
+the OpenTelemetry backend when `ash_oban` or `otel_telemetry_metrics` is among
+your dependencies, and prints a reporter snippet to add by hand when it finds
+no telemetry module. See `mix ash_metrics.install`.
 
 To install by hand, add the dependency:
 
@@ -60,7 +62,7 @@ config :ash_metrics,
   otp_app: :my_app,                                 # REQUIRED
   name_builder: AshMetrics.NameBuilder.Default,
   tag_extractor: AshMetrics.TagExtractor.Default,
-  backend: AshMetrics.Backend.Noop,
+  backend: AshMetrics.Backend.Noop,                 # Backend.Otel for OpenTelemetry
   poller: AshMetrics.Poller.GenServer,
   poll: true,                                       # false starts no poller
   tenant_source: MyApp.Tenants                      # per-tenant gauges only
@@ -252,8 +254,10 @@ errors naming the gauge. Zeroing a drained group is weaker than with the timer,
 since an Oban job has no state between runs. See `AshMetrics.Poller.AshOban`
 for all of it, and for the private action and schedule it generates per gauge.
 
-No poller runs at all when the configured backend reports the gauges itself,
-whichever one a resource selects; see [OpenTelemetry](#opentelemetry).
+A backend that reports the gauges itself, such as `AshMetrics.Backend.Otel`,
+starts no poller process, but the Oban schedules of a resource that selects
+this poller still run. Do not combine the two; see
+[OpenTelemetry](#opentelemetry).
 
 ### Multitenancy
 
@@ -324,20 +328,20 @@ config :ash_metrics, AshMetrics.Backend.Otel,
   timeout: 5_000
 ```
 
-The bridge stays yours. Keep splicing `AshMetrics.metrics()` into the list you
-hand it:
+The application keeps its own `OtelTelemetryMetrics` instance and splices
+`AshMetrics.metrics()` into the list it hands it:
 
 ```elixir
 {OtelTelemetryMetrics, metrics: my_own_metrics() ++ AshMetrics.metrics()}
 ```
 
-Counters and distributions go through the bridge, a declared `buckets` list
+Counters and distributions go through the bridge; a declared `buckets` list is
 carried on as the histogram's bucket boundaries. Gauges do not: the backend
 exports each one as an OpenTelemetry observable gauge, counted when the
-collector asks for a value and at most once per `period` per node, within
-`timeout` milliseconds. It therefore takes gauge polling over, so no poller is
-started and `AshMetrics.Poller.AshOban` must not be selected alongside it. See
-`AshMetrics.Backend.Otel`.
+collector asks for a value, at most once per `period` per node and within
+`timeout` milliseconds. The backend reports the gauges itself, so no poller
+process is started, and `AshMetrics.Poller.AshOban` must not be selected
+alongside it. See `AshMetrics.Backend.Otel`.
 
 ## Testing
 
