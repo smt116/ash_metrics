@@ -11,10 +11,24 @@ defmodule AshMetrics.ChildSpecsTest.Reporter do
   end
 end
 
+defmodule AshMetrics.ChildSpecsTest.GaugeReporter do
+  @moduledoc false
+  # A backend that reports the gauges itself, so that the pollers are left out.
+
+  @behaviour AshMetrics.Backend
+
+  @impl AshMetrics.Backend
+  def child_spec(_opts), do: %{id: __MODULE__, start: {Agent, :start_link, [fn -> :ok end]}}
+
+  @impl AshMetrics.Backend
+  def polls_gauges?, do: true
+end
+
 defmodule AshMetrics.ChildSpecsTest do
   # Swaps the configured backend, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
 
+  alias AshMetrics.ChildSpecsTest.GaugeReporter
   alias AshMetrics.ChildSpecsTest.Reporter
   alias AshMetrics.Poller
 
@@ -88,6 +102,18 @@ defmodule AshMetrics.ChildSpecsTest do
              AshMetrics.child_specs(name: :metrics, poll: true)
 
     assert state.() == [name: :metrics]
+  end
+
+  test "is the backend alone for a backend that reports the gauges itself" do
+    Application.put_env(:ash_metrics, :backend, GaugeReporter)
+
+    assert [%{id: GaugeReporter}] = AshMetrics.child_specs()
+  end
+
+  test "does not poll against a backend that reports the gauges itself" do
+    Application.put_env(:ash_metrics, :backend, GaugeReporter)
+
+    assert [%{id: GaugeReporter}] = AshMetrics.child_specs(poll: true)
   end
 
   test "returns specs a supervisor can actually start" do

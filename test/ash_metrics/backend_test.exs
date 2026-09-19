@@ -16,11 +16,25 @@ defmodule AshMetrics.BackendTest.Reporter do
   end
 end
 
+defmodule AshMetrics.BackendTest.GaugeReporter do
+  @moduledoc false
+  # A backend that reports the gauges itself.
+
+  @behaviour AshMetrics.Backend
+
+  @impl AshMetrics.Backend
+  def child_spec(_opts), do: :ignore
+
+  @impl AshMetrics.Backend
+  def polls_gauges?, do: true
+end
+
 defmodule AshMetrics.BackendTest do
   # Swaps the configured backend, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
 
   alias AshMetrics.Backend
+  alias AshMetrics.BackendTest.GaugeReporter
   alias AshMetrics.BackendTest.Reporter
   alias AshMetrics.Test.Invoice
 
@@ -73,6 +87,24 @@ defmodule AshMetrics.BackendTest do
       assert is_pid(pid)
 
       Supervisor.stop(supervisor)
+    end
+  end
+
+  describe "polls_gauges?/0" do
+    test "is false for a backend that does not implement the callback" do
+      Application.put_env(:ash_metrics, :backend, Reporter)
+
+      refute Backend.polls_gauges?()
+    end
+
+    test "is false for the default backend" do
+      refute Backend.polls_gauges?()
+    end
+
+    test "is what the backend says" do
+      Application.put_env(:ash_metrics, :backend, GaugeReporter)
+
+      assert Backend.polls_gauges?()
     end
   end
 

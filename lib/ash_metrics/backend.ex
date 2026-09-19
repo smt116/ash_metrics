@@ -34,7 +34,16 @@ defmodule AshMetrics.Backend do
   """
   @callback transform_metrics([Telemetry.Metrics.t()], keyword()) :: [Telemetry.Metrics.t()]
 
-  @optional_callbacks transform_metrics: 2
+  @doc """
+  Whether the backend computes and reports the declared gauges itself.
+
+  Optional, defaulting to `false`. `AshMetrics.child_specs/1` starts no
+  poller's children at all for a backend that returns `true`, whatever its
+  `:poll` option says.
+  """
+  @callback polls_gauges?() :: boolean()
+
+  @optional_callbacks transform_metrics: 2, polls_gauges?: 0
 
   @doc """
   The child specifications to add to a supervision tree for the configured
@@ -49,5 +58,18 @@ defmodule AshMetrics.Backend do
       :ignore -> []
       child_spec -> [child_spec]
     end
+  end
+
+  @doc """
+  Whether the configured backend reports the declared gauges itself.
+
+  `false` for a backend that does not implement `c:polls_gauges?/0`.
+  """
+  @spec polls_gauges?() :: boolean()
+  def polls_gauges? do
+    backend = Config.backend()
+
+    Code.ensure_loaded?(backend) and function_exported?(backend, :polls_gauges?, 0) and
+      backend.polls_gauges?()
   end
 end
