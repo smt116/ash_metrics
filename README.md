@@ -62,6 +62,7 @@ config :ash_metrics,
   tag_extractor: AshMetrics.TagExtractor.Default,
   backend: AshMetrics.Backend.Noop,
   poller: AshMetrics.Poller.GenServer,
+  poll: true,                                       # false starts no poller
   tenant_source: MyApp.Tenants                      # per-tenant gauges only
 
 # Only when the Oban poller is chosen; see "Polling with Oban".
@@ -331,6 +332,10 @@ imports the assertions. Name the metric as the declaration produces it, without
 the `.count`, `.gauge` or `.duration` suffix a reporter adds. `:telemetry` handlers are
 global, so keep such modules `async: false` — see `AshMetrics.Test` for the
 details.
+
+The installer writes `config :ash_metrics, poll: false` to `config/test.exs`,
+which keeps gauges from being polled while tests run. To poll them in a test,
+set it to `true` there or pass `poll: true` to `AshMetrics.Supervisor`.
 
 ## Development
 

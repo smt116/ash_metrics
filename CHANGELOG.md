@@ -10,6 +10,10 @@ and this project adheres to
 
 ### Added
 
+- `poll`, a runtime configuration key that keeps the gauge pollers from
+  starting without changing which poller a resource compiles with. It can
+  also be passed to `AshMetrics.Supervisor`. `mix ash_metrics.install` writes
+  `poll: false` to `config/test.exs`.
 - `mix ash_metrics.install` now prints how to select
   `AshMetrics.Poller.AshOban` when the application depends on `ash_oban`. It
   is a notice only; nothing is written to the configuration for it.
