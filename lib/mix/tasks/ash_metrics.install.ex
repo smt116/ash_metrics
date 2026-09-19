@@ -5,12 +5,16 @@ if Code.ensure_loaded?(Igniter) do
     @moduledoc """
     #{@shortdoc}
 
-    Writes the two pieces of configuration that AshMetrics cannot default:
+    Writes the configuration AshMetrics cannot default, and the one key that
+    differs per environment:
 
     * `prefix`, the first segment of every metric name, set to the name of
-      the application being installed into. See `AshMetrics.Config.prefix!/0`.
+      the application being installed into, in `config/config.exs`. See
+      `AshMetrics.Config.prefix!/0`.
     * `otp_app`, the application whose Ash domains are searched for resources
-      that declare metrics.
+      that declare metrics, in `config/config.exs`.
+    * `poll: false`, in `config/test.exs`, which keeps the gauge pollers from
+      starting there. See `AshMetrics.Config.poll?/0`.
 
     Everything else AshMetrics reads has a default; the task prints those
     rather than writing them out.
@@ -59,12 +63,14 @@ if Code.ensure_loaded?(Igniter) do
           tag_extractor: AshMetrics.TagExtractor.Default,
           backend: AshMetrics.Backend.Noop,
           poller: AshMetrics.Poller.GenServer,
+          poll: true,
           tenant_source: nil
 
     `poller` belongs in `config/config.exs` with the two keys that were
-    written: it is read while resources compile. `tenant_source` is needed
-    only by an application that declares a gauge on a resource which has to be
-    polled per tenant.
+    written: it is read while resources compile. `poll: false` was written to
+    `config/test.exs`, where it stops the gauge pollers from starting.
+    `tenant_source` is needed only by an application that declares a gauge on
+    a resource which has to be polled per tenant.
     """
 
     # Printed when the application already depends on `ash_oban`.
@@ -149,6 +155,7 @@ if Code.ensure_loaded?(Igniter) do
       igniter
       |> ProjectConfig.configure_new("config.exs", :ash_metrics, [:prefix], to_string(app_name))
       |> ProjectConfig.configure_new("config.exs", :ash_metrics, [:otp_app], app_name)
+      |> ProjectConfig.configure_new("test.exs", :ash_metrics, [:poll], false)
     end
 
     @spec add_to_reporter(Igniter.t()) :: Igniter.t()

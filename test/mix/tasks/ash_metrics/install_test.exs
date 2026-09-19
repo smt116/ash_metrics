@@ -62,6 +62,14 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
   end
   """
 
+  # A generated application imports the configuration of its environment.
+  # Without that line, configuring `test.exs` adds it to `config.exs`.
+  @config """
+  import Config
+
+  import_config "\#{config_env()}.exs"
+  """
+
   @repo """
   defmodule Test.Repo do
     use Ecto.Repo, otp_app: :test, adapter: Ecto.Adapters.Postgres
@@ -104,7 +112,7 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
             "lib/test/application.ex" => @application,
             "lib/test/repo.ex" => @repo,
             "lib/test_web/telemetry.ex" => @telemetry,
-            "config/config.exs" => "import Config\n"
+            "config/config.exs" => @config
           },
           overrides
         )
@@ -127,7 +135,7 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
     end
 
     test "adds the keys an application already configured is missing" do
-      %{"config/config.exs" => "import Config\n\nconfig :ash_metrics, prefix: \"custom\"\n"}
+      %{"config/config.exs" => @config <> "\nconfig :ash_metrics, prefix: \"custom\"\n"}
       |> phoenix_shaped_project()
       |> install()
       |> assert_has_patch("config/config.exs", """
@@ -138,11 +146,27 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
     test "leaves a prefix the application has already chosen alone" do
       %{
         "config/config.exs" =>
-          "import Config\n\nconfig :ash_metrics, prefix: \"chosen\", otp_app: :chosen\n"
+          @config <> "\nconfig :ash_metrics, prefix: \"chosen\", otp_app: :chosen\n"
       }
       |> phoenix_shaped_project()
       |> install()
       |> assert_unchanged("config/config.exs")
+    end
+
+    test "turns polling off in the test environment" do
+      phoenix_shaped_project()
+      |> install()
+      |> assert_creates("config/test.exs", """
+      import Config
+      config :ash_metrics, poll: false
+      """)
+    end
+
+    test "leaves a poll value the application has already chosen alone" do
+      %{"config/test.exs" => "import Config\n\nconfig :ash_metrics, poll: true\n"}
+      |> phoenix_shaped_project()
+      |> install()
+      |> assert_unchanged("config/test.exs")
     end
 
     test "imports the formatter configuration of the package" do
@@ -158,6 +182,7 @@ defmodule Mix.Tasks.AshMetrics.InstallTest do
 
       assert_has_notice(igniter, &String.contains?(&1, "backend: AshMetrics.Backend.Noop"))
       assert_has_notice(igniter, &String.contains?(&1, "poller: AshMetrics.Poller.GenServer"))
+      assert_has_notice(igniter, &String.contains?(&1, "poll: true"))
       assert_has_notice(igniter, &String.contains?(&1, "tenant_source: nil"))
     end
   end
