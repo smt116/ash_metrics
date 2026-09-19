@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `usage-rules.md` and `usage-rules/`, rules for an agent writing code with
+  AshMetrics: declaring metrics, emitting them, gauges, pollers and
+  backends, configuration and testing. They ship in the package, so a
+  consuming application folds them into its own rules file with
+  `mix usage_rules.sync`, naming `ash_metrics:all` for every topic or
+  `ash_metrics:emitting` for one of them.
+
 ## [0.3.0] - 2026-09-19
 
 ### Added

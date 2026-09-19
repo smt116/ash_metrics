@@ -48,7 +48,8 @@ defmodule AshMetrics.MixProject do
         "GitHub" => @source_url,
         "Changelog" => "#{@source_url}/blob/main/CHANGELOG.md"
       },
-      files: ~w(lib documentation .formatter.exs mix.exs README.md LICENSE CHANGELOG.md)
+      files: ~w(lib documentation usage-rules.md usage-rules .formatter.exs
+                mix.exs README.md LICENSE CHANGELOG.md)
     ]
   end
 
