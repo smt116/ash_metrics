@@ -10,12 +10,26 @@ and this project adheres to
 
 ### Added
 
+- `suffix:` on a `distribution`, the last segment of its metric name.
+  `AshMetrics.Dsl.Distribution.default_suffix/1` derives it from the declared
+  `unit` when it is absent, and a verifier rejects a suffix that is empty or
+  holds a dot.
 - `usage-rules.md` and `usage-rules/`, rules for an agent writing code with
   AshMetrics: declaring metrics, emitting them, gauges, pollers and
   backends, configuration and testing. They ship in the package, so a
   consuming application folds them into its own rules file with
   `mix usage_rules.sync`, naming `ash_metrics:all` for every topic or
   `ash_metrics:emitting` for one of them.
+
+### Changed
+
+- A distribution whose `unit` is neither a time unit nor a byte unit is now
+  named `.value`, where it was named `.duration`. A distribution declaring a
+  time unit or a conversion tuple keeps `.duration`, and one declaring
+  `:byte`, `:kilobyte` or `:megabyte` is now named `.bytes`. Declare
+  `suffix: :duration` to keep the old name of a metric already shipped.
+- `time_unit?/1` now lives on `AshMetrics.Dsl.Distribution`, alongside
+  `time_units/0`, rather than on `AshMetrics.Changes.ObserveElapsed`.
 
 ## [0.3.0] - 2026-09-19
 

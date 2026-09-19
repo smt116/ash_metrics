@@ -69,9 +69,13 @@ A gauge has no `tags:`. Its tags are its `group_by:` attributes; see
 
 A declaration compiles to
 `<prefix>.<domain>.<resource>.<metric>` plus the suffix of its aggregation:
-`.count` for a counter, `.gauge` for a gauge, `.duration` for a distribution.
-The `delivery` counter above becomes
-`myapp.mailings.templated_delivery.delivery.count`.
+`.count` for a counter, `.gauge` for a gauge, and for a distribution the
+suffix derived from its `unit` — `.duration` for a time unit or a conversion
+tuple, `.bytes` for `:byte`, `:kilobyte` or `:megabyte`, `.value` for anything
+else — unless it declares `suffix:` itself. The `delivery` counter above
+becomes `myapp.mailings.templated_delivery.delivery.count`, and the
+`send_latency` distribution
+`myapp.mailings.templated_delivery.send_latency.duration`.
 
 Renaming a shipped metric breaks every dashboard, alert and recording rule
 built on it, and the old series does not migrate. Never rename one casually.

@@ -89,7 +89,7 @@ defmodule AshMetrics.MetricsTest do
     test "omits reporter options when a distribution declares no buckets" do
       assert [%Counter{}, %Distribution{} = distribution] = AshMetrics.metrics_for([Invoice])
 
-      assert distribution.name == [:test, :mailings, :invoice, :settlement_lag, :duration]
+      assert distribution.name == [:test, :mailings, :invoice, :settlement_lag, :value]
       assert distribution.measurement == :value
       assert distribution.unit == :unit
       assert distribution.tags == [:tenant]
@@ -101,11 +101,20 @@ defmodule AshMetrics.MetricsTest do
     end
 
     test "tags a metric with every declared key, closed or open, plus the extractor keys" do
-      assert [%Counter{} = counter, %Distribution{} = distribution] =
+      assert [%Counter{} = counter, %Distribution{} = distribution | _rest] =
                AshMetrics.metrics_for([Shipment])
 
       assert counter.tags == [:carrier, :status, :tenant]
       assert distribution.tags == [:carrier, :region, :tenant]
+    end
+
+    test "names a distribution after the suffix its unit derives" do
+      assert [_dispatch, transit_time, label_size, handling_delay] =
+               AshMetrics.metrics_for([Shipment])
+
+      assert transit_time.name == [:test, :mailings, :shipment, :transit_time, :duration]
+      assert label_size.name == [:test, :mailings, :shipment, :label_size, :bytes]
+      assert handling_delay.name == [:test, :mailings, :shipment, :handling_delay, :latency]
     end
 
     test "compiles a gauge into a Telemetry.Metrics.LastValue" do
@@ -182,9 +191,11 @@ defmodule AshMetrics.MetricsTest do
                [:test, :mailings, :templated_delivery, :delivery, :count],
                [:test, :mailings, :templated_delivery, :send_latency, :duration],
                [:test, :mailings, :invoice, :capture, :count],
-               [:test, :mailings, :invoice, :settlement_lag, :duration],
+               [:test, :mailings, :invoice, :settlement_lag, :value],
                [:test, :mailings, :shipment, :dispatch, :count],
                [:test, :mailings, :shipment, :transit_time, :duration],
+               [:test, :mailings, :shipment, :label_size, :bytes],
+               [:test, :mailings, :shipment, :handling_delay, :latency],
                [:test, :queue, :job, :backlog, :gauge],
                [:test, :queue, :job, :total, :gauge],
                [:test, :queue, :tenant_job, :backlog, :gauge],

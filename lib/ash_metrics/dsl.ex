@@ -64,6 +64,10 @@ defmodule AshMetrics.Dsl do
     boundaries, passed through untouched, and `unit` may be a conversion tuple,
     so a call site can observe a native time unit without converting first.
 
+    The last segment of the metric name is `suffix`, which
+    `AshMetrics.Dsl.Distribution.default_suffix/1` derives from `unit` when the
+    declaration gives none.
+
     As with counters, `tags` is an allowlist of the keys a call site may pass,
     and an entry written `key: [value, ...]` closes the tag to those values.
     """,
@@ -80,7 +84,7 @@ defmodule AshMetrics.Dsl do
     ],
     target: AshMetrics.Dsl.Distribution,
     args: [:name],
-    transform: {AshMetrics.Dsl.Tags, :transform, []},
+    transform: {AshMetrics.Dsl.Distribution, :transform, []},
     schema: [
       name: [
         type: :atom,
@@ -98,6 +102,12 @@ defmodule AshMetrics.Dsl do
         required: false,
         doc:
           "Histogram bucket boundaries, strictly ascending and positive. Passed to the reporter as `reporter_options[:buckets]`."
+      ],
+      suffix: [
+        type: :atom,
+        required: false,
+        doc:
+          "The last segment of the metric name, a single segment holding no dot. Defaults to what `AshMetrics.Dsl.Distribution.default_suffix/1` derives from `unit`."
       ],
       tags: [
         type: @tags_type,

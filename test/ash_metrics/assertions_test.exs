@@ -10,11 +10,13 @@ defmodule AshMetrics.AssertionsTest do
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.Invoice
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.Shipment
 
   @delivery "test.mailings.templated_delivery.delivery"
   @send_latency "test.mailings.templated_delivery.send_latency"
   @capture "test.mailings.invoice.capture"
   @backlog "test.queue.job.backlog"
+  @label_size "test.mailings.shipment.label_size"
 
   describe "AshMetrics.Backend.Test" do
     test "starts nothing" do
@@ -68,6 +70,12 @@ defmodule AshMetrics.AssertionsTest do
 
       assert {%{value: 142}, %{provider: "ses"}} =
                assert_metric_emitted(@send_latency, value: 142, tags: %{provider: "ses"})
+    end
+
+    test "matches a distribution whose name suffix is not .duration" do
+      AshMetrics.observe(Shipment, :label_size, 2048)
+
+      assert {%{value: 2048}, _tags} = assert_metric_emitted(@label_size, value: 2048)
     end
 
     test "leaves emissions of other metrics in the mailbox" do

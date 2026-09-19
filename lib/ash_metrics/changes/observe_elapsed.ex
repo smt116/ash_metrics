@@ -8,10 +8,10 @@ defmodule AshMetrics.Changes.ObserveElapsed do
 
   The change registers an `Ash.Changeset.after_transaction/2` hook. On
   `{:ok, record}` it observes `to - from` through `AshMetrics.observe/4`, in
-  the distribution's declared `unit`, which must be `:second`, `:millisecond`,
-  `:microsecond` or `:nanosecond`. `to` defaults to `:now`, the moment the hook
-  runs. A negative result is observed as it is. On an error it observes
-  nothing, and it never alters the action's result.
+  the distribution's declared `unit`, which must be one of
+  `AshMetrics.Dsl.Distribution.time_units/0`. `to` defaults to `:now`, the
+  moment the hook runs. A negative result is observed as it is. On an error it
+  observes nothing, and it never alters the action's result.
 
   Nothing is observed when either timestamp is `nil` on the record. Restrict
   the change to a particular transition with `where:` on the `change`
@@ -47,16 +47,6 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   alias AshMetrics.Changes.Emission
   alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Info
-
-  @time_units [:second, :millisecond, :microsecond, :nanosecond]
-
-  @doc """
-  Whether `unit` is a unit this change can measure an elapsed time in.
-
-  The units are #{Enum.map_join(@time_units, ", ", &"`#{inspect(&1)}`")}.
-  """
-  @spec time_unit?(Distribution.unit()) :: boolean()
-  def time_unit?(unit), do: unit in @time_units
 
   @impl Ash.Resource.Change
   @spec init(keyword()) :: {:ok, keyword()} | {:error, String.t()}
@@ -116,14 +106,14 @@ defmodule AshMetrics.Changes.ObserveElapsed do
 
   @spec unit!(Distribution.t()) :: atom()
   defp unit!(distribution) do
-    if time_unit?(distribution.unit) do
+    if Distribution.time_unit?(distribution.unit) do
       distribution.unit
     else
       raise ArgumentError,
             "distribution #{inspect(distribution.name)} declares the unit " <>
               "#{inspect(distribution.unit)}, which is not a time unit. " <>
               "An elapsed time is measured in one of: " <>
-              Enum.map_join(@time_units, ", ", &inspect/1)
+              Enum.map_join(Distribution.time_units(), ", ", &inspect/1)
     end
   end
 

@@ -242,6 +242,10 @@ histogram itself is built by the reporter. `buckets` are reporter specific
 boundaries, passed through untouched, and `unit` may be a conversion tuple,
 so a call site can observe a native time unit without converting first.
 
+The last segment of the metric name is `suffix`, which
+`AshMetrics.Dsl.Distribution.default_suffix/1` derives from `unit` when the
+declaration gives none.
+
 As with counters, `tags` is an allowlist of the keys a call site may pass,
 and an entry written `key: [value, ...]` closes the tag to those values.
 
@@ -276,6 +280,7 @@ end
 |------|------|---------|------|
 | [`unit`](#metrics-distribution-unit){: #metrics-distribution-unit } | `atom \| {atom, atom}` | `:unit` | The unit of the observed value, or a `Telemetry.Metrics` conversion tuple such as `{:native, :millisecond}`. |
 | [`buckets`](#metrics-distribution-buckets){: #metrics-distribution-buckets } | `list(number)` |  | Histogram bucket boundaries, strictly ascending and positive. Passed to the reporter as `reporter_options[:buckets]`. |
+| [`suffix`](#metrics-distribution-suffix){: #metrics-distribution-suffix } | `atom` |  | The last segment of the metric name, a single segment holding no dot. Defaults to what `AshMetrics.Dsl.Distribution.default_suffix/1` derives from `unit`. |
 | [`tags`](#metrics-distribution-tags){: #metrics-distribution-tags } | `list(atom \| {atom, list(atom)})` | `[]` | The tag keys this distribution accepts at the call site. An entry with a list of values closes the tag to them and requires it on every observation. |
 | [`description`](#metrics-distribution-description){: #metrics-distribution-description } | `String.t` |  | A human readable description, passed through to the metric definition. |
 

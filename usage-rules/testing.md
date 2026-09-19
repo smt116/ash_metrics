@@ -36,8 +36,8 @@ use AshMetrics.Test, resources: [MyApp.Mailings.TemplatedDelivery]
 ## The assertions
 
 `assert_metric_emitted/2` and `refute_metric_emitted/2` take the metric name
-as the declaration produces it, **without** the `.count`, `.gauge` or
-`.duration` suffix a reporter appends.
+as the declaration produces it, **without** the aggregation suffix a reporter
+appends.
 
 - `tags:` — a map or a keyword list, matched as a subset. An emission
   carrying tags the assertion says nothing about still matches.

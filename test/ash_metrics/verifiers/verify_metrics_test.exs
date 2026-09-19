@@ -108,6 +108,22 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert Exception.message(error) =~ "declares buckets []"
   end
 
+  test "a suffix may not contain a dot" do
+    assert [%DslError{} = error] =
+             errors(quote(do: distribution(:send_latency, suffix: :"a.b")))
+
+    message = Exception.message(error)
+
+    assert message =~ ~s(distribution :send_latency declares the suffix :"a.b")
+    assert message =~ "non-empty atom holding no dot"
+  end
+
+  test "a suffix may not be empty" do
+    assert [%DslError{} = error] = errors(quote(do: distribution(:send_latency, suffix: :"")))
+
+    assert Exception.message(error) =~ ~s(declares the suffix :"")
+  end
+
   test "a gauge shares the metric namespace with a counter" do
     assert [%DslError{path: [:metrics, :backlog]} = error] =
              errors(

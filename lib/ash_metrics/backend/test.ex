@@ -9,8 +9,7 @@ defmodule AshMetrics.Backend.Test do
       {:ash_metrics, name, measurements, metadata}
 
   `name` is the metric name without its aggregation suffix: the name a
-  declaration produces, not the `.count` or `.duration` variant a reporter
-  publishes.
+  declaration produces, not the suffixed variant a reporter publishes.
 
   Handlers are keyed by the receiving process, so each test attaches and
   detaches its own. `:telemetry` handlers are still global: an attachment is

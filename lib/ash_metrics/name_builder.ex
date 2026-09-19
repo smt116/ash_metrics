@@ -10,9 +10,8 @@ defmodule AshMetrics.NameBuilder do
   The configured value must be a module; there is no function-capture or MFA
   form. The default is `AshMetrics.NameBuilder.Default`.
 
-  The name a builder returns does not include the aggregation suffix
-  (`.count`, `.duration`); that is appended when the declarations are compiled
-  to metric definitions.
+  The name a builder returns does not include the aggregation suffix; that is
+  appended when the declarations are compiled to metric definitions.
   """
 
   alias AshMetrics.Config

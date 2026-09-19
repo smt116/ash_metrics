@@ -126,7 +126,7 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   @spec verify_unit(map(), source(), Change.t(), Distribution.t()) ::
           :ok | {:error, Exception.t()}
   defp verify_unit(dsl_state, source, change, distribution) do
-    if ObserveElapsed.time_unit?(distribution.unit) do
+    if Distribution.time_unit?(distribution.unit) do
       :ok
     else
       error(

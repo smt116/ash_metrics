@@ -387,9 +387,8 @@ end
 
 `use AshMetrics.Test` attaches a handler for the duration of each test and
 imports the assertions. Name the metric as the declaration produces it, without
-the `.count`, `.gauge` or `.duration` suffix a reporter adds. `:telemetry` handlers are
-global, so keep such modules `async: false` — see `AshMetrics.Test` for the
-details.
+the aggregation suffix a reporter adds. `:telemetry` handlers are global, so
+keep such modules `async: false` — see `AshMetrics.Test` for the details.
 
 The installer writes `config :ash_metrics, poll: false` to `config/test.exs`,
 which keeps gauges from being polled while tests run. To poll them in a test,

@@ -464,7 +464,7 @@ defmodule AshMetrics do
   first.
 
   A counter becomes a `Telemetry.Metrics.Counter` named `<metric>.count`, a
-  distribution a `Telemetry.Metrics.Distribution` named `<metric>.duration`,
+  distribution a `Telemetry.Metrics.Distribution` named after its `suffix`,
   and a gauge a `Telemetry.Metrics.LastValue` named `<metric>.gauge`, where the
   part before the suffix is what the configured `AshMetrics.NameBuilder`
   returns. A counter's and a distribution's tags are the declared tag keys plus
@@ -507,7 +507,8 @@ defmodule AshMetrics do
 
   defp definition(resource, %Distribution{} = distribution, extractor_keys) do
     Telemetry.Metrics.distribution(
-      NameBuilder.build(resource, distribution.name) <> ".duration",
+      NameBuilder.build(resource, distribution.name) <>
+        "." <> Atom.to_string(distribution.suffix),
       [
         event_name: event_name(resource, distribution.name),
         measurement: :value,

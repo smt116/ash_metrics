@@ -12,6 +12,7 @@ defmodule AshMetrics.InfoTest do
   alias AshMetrics.Test.MarkerPoller
   alias AshMetrics.Test.Plain
   alias AshMetrics.Test.Shipment
+  alias AshMetrics.Test.Ticket
 
   describe "metrics/1" do
     test "returns the declarations of a resource in declaration order" do
@@ -56,6 +57,17 @@ defmodule AshMetrics.InfoTest do
                  description: nil
                }
              ] = Info.metrics(Invoice)
+    end
+
+    test "derives a distribution's suffix from its unit" do
+      assert %Distribution{suffix: :duration} = Info.metric!(Delivery, :send_latency)
+      assert %Distribution{suffix: :duration} = Info.metric!(Ticket, :time_to_resolve)
+      assert %Distribution{suffix: :bytes} = Info.metric!(Shipment, :label_size)
+      assert %Distribution{suffix: :value} = Info.metric!(Invoice, :settlement_lag)
+    end
+
+    test "keeps the suffix a distribution declares" do
+      assert %Distribution{suffix: :latency} = Info.metric!(Shipment, :handling_delay)
     end
 
     test "returns an empty list for a resource without the extension" do

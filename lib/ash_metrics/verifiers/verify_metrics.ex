@@ -12,6 +12,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * a closed tag declares at least one value, and no value twice
   * bucket boundaries are a non-empty, strictly ascending list of positive
     numbers
+  * a distribution's name suffix is a non-empty atom holding no dot, so that
+    it is one segment of the metric name
   * a gauge groups by attributes of the resource, and by none of them twice
 
   A gauge's `group_by` is not checked against the reserved tags: a gauge has no
@@ -66,7 +68,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
 
   defp verify_metric(dsl_state, %Distribution{} = distribution) do
     with :ok <- verify_tags(dsl_state, distribution),
-         do: verify_buckets(dsl_state, distribution)
+         :ok <- verify_buckets(dsl_state, distribution),
+         do: verify_suffix(dsl_state, distribution)
   end
 
   defp verify_metric(dsl_state, %Gauge{} = gauge) do
@@ -197,6 +200,22 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
         "distribution #{inspect(distribution.name)} declares buckets " <>
           "#{inspect(buckets, charlists: :as_lists)}. Buckets must be a non-empty, " <>
           "strictly ascending list of positive numbers."
+      )
+    end
+  end
+
+  defp verify_suffix(dsl_state, %Distribution{suffix: suffix} = distribution) do
+    segment = Atom.to_string(suffix)
+
+    if segment != "" and not String.contains?(segment, ".") do
+      :ok
+    else
+      error(
+        dsl_state,
+        distribution,
+        "distribution #{inspect(distribution.name)} declares the suffix " <>
+          "#{inspect(suffix)}. A suffix is the last segment of the metric " <>
+          "name, so it is a non-empty atom holding no dot."
       )
     end
   end
