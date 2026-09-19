@@ -39,15 +39,16 @@ mix igniter.install ash_metrics
 ```
 
 It adds the dependency, writes `prefix` and `otp_app` to `config/config.exs`
-and `poll: false` to `config/test.exs`, appends `++ AshMetrics.metrics()` to
-the `metrics/0` of the module that imports `Telemetry.Metrics` —
-`MyAppWeb.Telemetry` in a generated Phoenix application — and adds
-`AshMetrics.Supervisor` to your application's children after the repositories.
-It never overwrites a value you have already chosen, prints the optional
-configuration keys with their defaults, prints how to select the Oban poller or
-the OpenTelemetry backend when `ash_oban` or `otel_telemetry_metrics` is among
-your dependencies, and prints a reporter snippet to add by hand when it finds
-no telemetry module. See `mix ash_metrics.install`.
+and `poll: false` to `config/test.exs`, imports the package's formatter
+configuration, appends `++ AshMetrics.metrics()` to the `metrics/0` of the
+module that imports `Telemetry.Metrics` — `MyAppWeb.Telemetry` in a generated
+Phoenix application — and adds `AshMetrics.Supervisor` to your application's
+children after the repositories and Oban. It never overwrites a value you have
+already chosen, prints the optional configuration keys with their defaults,
+prints how to select the Oban poller or the OpenTelemetry backend when
+`ash_oban` or `otel_telemetry_metrics` is among your dependencies, and prints a
+reporter snippet to add by hand when it finds no telemetry module. See
+`mix ash_metrics.install`.
 
 To install by hand, add the dependency:
 
@@ -357,7 +358,8 @@ The application keeps its own `OtelTelemetryMetrics` instance and splices
 Counters and distributions go through the bridge; a declared `buckets` list is
 carried on as the histogram's bucket boundaries. Gauges do not: the backend
 exports each one as an OpenTelemetry observable gauge serving the values the
-configured poller reports to it. With `AshMetrics.Poller.AshOban` that is one
+configured poller reports to it, so the pollers must run — with `poll: false`
+no gauge is exported. With `AshMetrics.Poller.AshOban` that is one
 query and one series per gauge for the whole cluster; with the default timer
 poller, one of each per node. A series carries the exporting node's resource
 attributes, so aggregate over `host` when querying, and when the poll moves to
