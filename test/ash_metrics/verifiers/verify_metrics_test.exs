@@ -68,6 +68,165 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
              "distribution :send_latency declares the tag :provider more than once"
   end
 
+  test "a path may descend one or two embedded resources" do
+    assert errors(
+             quote do
+               counter :delivery,
+                 tags: [
+                   state: [path: [:location, :state]],
+                   shipping_state: [path: [:location, :shipping_address, :state]]
+                 ]
+             end,
+             [location()]
+           ) == []
+  end
+
+  test "a path through a NewType wrapping an embedded resource is accepted" do
+    assert errors(
+             quote(do: counter(:delivery, tags: [state: [path: [:origin, :state]]])),
+             [quote(do: attribute(:origin, AshMetrics.Test.LocationType))]
+           ) == []
+  end
+
+  test "a path starts at an attribute of the resource" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [state: [path: [:nope, :state]]])),
+               [location()]
+             )
+
+    message = Exception.message(error)
+
+    assert message =~
+             "the path of the tag :state of counter :delivery starts at :nope, " <>
+               "which is not an attribute of this resource"
+
+    assert message =~ "Declared attributes: :id, :status, :location"
+  end
+
+  test "a path may only descend through an embedded resource" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [state: [path: [:status, :name]]])))
+
+    message = Exception.message(error)
+
+    assert message =~ "goes through :status, whose type Ash.Type.Atom is not an embedded"
+    assert message =~ "descends through embedded attributes only"
+  end
+
+  test "every later segment is an attribute of the embedded resource before it" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [state: [path: [:location, :nope]]])),
+               [location()]
+             )
+
+    message = Exception.message(error)
+
+    assert message =~ "names :nope, which is not an attribute of AshMetrics.Test.Location"
+    assert message =~ "Declared attributes: :state, :shipping_address"
+  end
+
+  test "a path may not go through a list" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [state: [path: [:stops, :state]]])),
+               [quote(do: attribute(:stops, {:array, AshMetrics.Test.Address}))]
+             )
+
+    message = Exception.message(error)
+
+    assert message =~ "goes through :stops, whose type"
+    assert message =~ "A path cannot go through a list"
+  end
+
+  test "a path may not end at an embedded resource" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(
+                 do: counter(:delivery, tags: [where: [path: [:location, :shipping_address]]])
+               ),
+               [location()]
+             )
+
+    message = Exception.message(error)
+
+    assert message =~
+             "ends at :shipping_address, whose type AshMetrics.Test.Address is an " <>
+               "embedded resource"
+
+    assert message =~ "End the path at one of its attributes: :state"
+  end
+
+  test "a path may not end at a map" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [payload: [path: [:payload]]])),
+               [quote(do: attribute(:payload, :map))]
+             )
+
+    assert Exception.message(error) =~
+             "ends at :payload, whose type Ash.Type.Map holds several values"
+  end
+
+  test "an empty path is refused" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [state: [path: []]])))
+
+    assert Exception.message(error) =~
+             "counter :delivery declares an empty path for the tag :state"
+  end
+
+  test "a tag naming an embedded attribute without a path is refused" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [:location])), [location()])
+
+    message = Exception.message(error)
+
+    assert message =~
+             "counter :delivery declares the tag :location, whose attribute has " <>
+               "the type AshMetrics.Test.Location"
+
+    assert message =~ "declare `location: [path: [:location, ...]]`"
+  end
+
+  test "a tag naming a map attribute without a path is refused" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: distribution(:send_latency, tags: [:payload])),
+               [quote(do: attribute(:payload, :map))]
+             )
+
+    assert Exception.message(error) =~
+             "distribution :send_latency declares the tag :payload, whose attribute " <>
+               "has the type Ash.Type.Map"
+  end
+
+  test "a path tag is checked against the reserved tags like any other" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [tenant: [path: [:location, :state]]])),
+               [location()]
+             )
+
+    assert Exception.message(error) =~ "declares the tag :tenant, which is reserved"
+  end
+
+  test "a path tag may not be declared twice" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(
+                 do:
+                   counter(:delivery,
+                     tags: [:state, state: [path: [:location, :state]]]
+                   )
+               ),
+               [location()]
+             )
+
+    assert Exception.message(error) =~ "declares the tag :state more than once"
+  end
+
   test "a tag the extractor supplies is reserved" do
     assert [%DslError{} = error] =
              errors(quote(do: counter(:delivery, tags: [:tenant, status: [:sent]])))
@@ -194,6 +353,9 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert Compiler.dsl_errors(quote(do: nil)) == []
     assert length(Info.metrics(Delivery)) == 2
   end
+
+  # The embedded attribute the tag paths under test descend into.
+  defp location, do: quote(do: attribute(:location, AshMetrics.Test.Location))
 
   # The throwaway resource declares a `status` attribute, so that a gauge has
   # something valid to group by; pass `attributes` for anything else it needs.

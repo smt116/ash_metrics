@@ -108,6 +108,12 @@ that a closed tag lists at least one value and no duplicates, that buckets
 are strictly ascending positive numbers, and that a gauge groups by
 attributes of the resource.
 
+They check a `path:` too: it must start at an attribute of the resource,
+descend through embedded resources only, never through a list, and end at an
+attribute that holds a single value. A tag with no path may not name an
+attribute holding a map, a struct or an embedded resource either — give it a
+path into that attribute, or name the value the call site passes.
+
 A verifier failure is reported through `IO.warn` as a compiler warning
 pointing at the declaration, not as a hard error. Compile with
 `mix compile --warnings-as-errors` in CI, or a bad declaration ships.

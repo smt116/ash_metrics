@@ -39,6 +39,9 @@ defmodule AshMetrics.Dsl.Tags do
   The tag is left off the emission when a segment of the walk is `nil`, and
   when the value the walk arrives at is a map or a struct.
 
+  `AshMetrics.Verifiers.VerifyMetrics` checks a path against the resource's
+  attributes while it compiles.
+
   Every form normalizes to the `tags`, `tag_values` and `tag_paths` fields of
   the declaration, so nothing downstream sees the difference.
   """
