@@ -8,6 +8,12 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `mix ash_metrics.install` now prints how to select
+  `AshMetrics.Poller.AshOban` when the application depends on `ash_oban`. It
+  is a notice only; nothing is written to the configuration for it.
+
 ## [0.1.0] - 2026-09-18
 
 ### Added
