@@ -43,7 +43,26 @@ defmodule AshMetrics.Backend do
   """
   @callback polls_gauges?() :: boolean()
 
-  @optional_callbacks transform_metrics: 2, polls_gauges?: 0
+  @doc """
+  Takes the result of one successful poll of one gauge.
+
+  Optional. A backend that implements it is handed every successful poll the
+  configured `AshMetrics.Poller` makes, in the process that ran the poll,
+  instead of the `:telemetry` events `AshMetrics.Gauge.Runner.emit/3` would
+  otherwise execute. `groups` is what `AshMetrics.Gauge.Runner.poll/2`
+  returns: one `{tags, value}` tuple per group of this poll.
+
+  A failed poll is not reported, and no group is zeroed on the backend's
+  behalf; a group that was reported before and is absent from `groups` is the
+  backend's to handle.
+  """
+  @callback report_gauge(
+              resource :: module(),
+              gauge :: AshMetrics.Dsl.Gauge.t(),
+              groups :: [AshMetrics.Gauge.Strategy.group()]
+            ) :: :ok
+
+  @optional_callbacks transform_metrics: 2, polls_gauges?: 0, report_gauge: 3
 
   @doc """
   The child specifications to add to a supervision tree for the configured
@@ -71,5 +90,17 @@ defmodule AshMetrics.Backend do
 
     Code.ensure_loaded?(backend) and function_exported?(backend, :polls_gauges?, 0) and
       backend.polls_gauges?()
+  end
+
+  @doc """
+  Whether the configured backend takes the gauge values a poll collects.
+
+  `false` for a backend that does not implement `c:report_gauge/3`.
+  """
+  @spec reports_gauges?() :: boolean()
+  def reports_gauges? do
+    backend = Config.backend()
+
+    Code.ensure_loaded?(backend) and function_exported?(backend, :report_gauge, 3)
   end
 end

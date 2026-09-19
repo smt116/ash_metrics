@@ -4,7 +4,9 @@ defmodule AshMetrics.Gauge.Runner do
 
   A poll asks the gauge's `AshMetrics.Gauge.Strategy` for the current value of
   every group. `poll/2` returns those values; `emit/3` executes one
-  `:telemetry` event per group as well and reports which groups were found. An
+  `:telemetry` event per group as well and reports which groups were found, or
+  hands the groups to a configured `AshMetrics.Backend` implementing
+  `c:AshMetrics.Backend.report_gauge/3` and executes no event at all. An
   `AshMetrics.Poller` decides *when* to poll and calls this module; call it by
   hand from a test, an IEx session, or an application that schedules gauges
   itself.
@@ -35,10 +37,12 @@ defmodule AshMetrics.Gauge.Runner do
 
   `emit/3` is given the groups the previous poll found and emits a zero for
   every one of them that is missing from this poll, once. It returns the groups
-  it found, for the caller to hand back next time.
+  it found, for the caller to hand back next time. Nothing is zeroed for a
+  backend that takes the groups through `c:AshMetrics.Backend.report_gauge/3`.
   """
 
   alias Ash.Resource.Info, as: ResourceInfo
+  alias AshMetrics.Backend
   alias AshMetrics.Config
   alias AshMetrics.Dsl.Gauge
   alias AshMetrics.Gauge.Strategy
@@ -80,6 +84,12 @@ defmodule AshMetrics.Gauge.Runner do
   nothing is zeroed, because a failed poll says nothing about which groups
   still exist. A caller that keeps the groups should keep the ones it had.
 
+  A configured `AshMetrics.Backend` implementing
+  `c:AshMetrics.Backend.report_gauge/3` is handed the groups of a successful
+  poll instead: no `:telemetry` event is executed, `known_groups` is ignored,
+  and a failed poll reports nothing at all, not even the groups computed
+  before the error. The return value is the same either way.
+
   Errors are returned rather than raised, but a strategy that raises is not
   caught here; `AshMetrics.Poller.GenServer` is what keeps a raising strategy
   from taking a poller down.
@@ -87,6 +97,29 @@ defmodule AshMetrics.Gauge.Runner do
   @spec emit(module(), Gauge.t(), known_groups()) ::
           {:ok, [AshMetrics.tags()]} | {:error, term()}
   def emit(resource, %Gauge{} = gauge, known_groups \\ []) do
+    if Backend.reports_gauges?() do
+      report(resource, gauge)
+    else
+      execute_each(resource, gauge, known_groups)
+    end
+  end
+
+  @spec report(module(), Gauge.t()) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
+  defp report(resource, %Gauge{} = gauge) do
+    case collect(resource, gauge) do
+      {:ok, groups} ->
+        :ok = Config.backend().report_gauge(resource, gauge, groups)
+
+        {:ok, Enum.map(groups, fn {tags, _value} -> tags end)}
+
+      {:error, error, _computed} ->
+        {:error, error}
+    end
+  end
+
+  @spec execute_each(module(), Gauge.t(), known_groups()) ::
+          {:ok, [AshMetrics.tags()]} | {:error, term()}
+  defp execute_each(resource, %Gauge{} = gauge, known_groups) do
     case collect(resource, gauge) do
       {:ok, groups} ->
         emitted = execute_all(resource, gauge, groups)

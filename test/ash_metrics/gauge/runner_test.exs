@@ -25,6 +25,24 @@ defmodule AshMetrics.Gauge.RunnerTest.FailingForOneTenant do
   end
 end
 
+defmodule AshMetrics.Gauge.RunnerTest.Reporting do
+  @moduledoc false
+  # A backend that takes the gauge values instead of the telemetry path. The
+  # poll runs in the calling process, so the test process is its own mailbox.
+
+  @behaviour AshMetrics.Backend
+
+  @impl AshMetrics.Backend
+  def child_spec(_opts), do: :ignore
+
+  @impl AshMetrics.Backend
+  def report_gauge(resource, gauge, groups) do
+    send(self(), {:reported, resource, gauge.name, Enum.sort(groups)})
+
+    :ok
+  end
+end
+
 defmodule AshMetrics.Gauge.RunnerTest do
   # Seeds shared ETS tables and attaches a telemetry handler, so it cannot run
   # alongside other tests.
@@ -33,6 +51,7 @@ defmodule AshMetrics.Gauge.RunnerTest do
   alias AshMetrics.Gauge.Runner
   alias AshMetrics.Gauge.RunnerTest.Failing
   alias AshMetrics.Gauge.RunnerTest.FailingForOneTenant
+  alias AshMetrics.Gauge.RunnerTest.Reporting
   alias AshMetrics.Info
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.GlobalTenantJob
@@ -338,6 +357,70 @@ defmodule AshMetrics.Gauge.RunnerTest do
 
       assert Runner.emit(Job, failing, [%{status: :pending}]) == {:error, :no_database}
       assert emitted(Job, :backlog) == []
+    end
+  end
+
+  describe "emit/3 with a backend that takes the gauge values" do
+    setup do
+      original = Application.get_env(:ash_metrics, :backend)
+      Application.put_env(:ash_metrics, :backend, Reporting)
+
+      on_exit(fn ->
+        case original do
+          nil -> Application.delete_env(:ash_metrics, :backend)
+          backend -> Application.put_env(:ash_metrics, :backend, backend)
+        end
+      end)
+
+      :ok
+    end
+
+    test "hands every group to the backend and emits nothing", %{backlog: backlog} do
+      seed(Job, status: :pending, provider: "ses")
+      seed(Job, status: :pending, provider: "ses")
+      seed(Job, status: :processing, provider: "smtp")
+
+      assert {:ok, groups} = Runner.emit(Job, backlog)
+
+      assert Enum.sort(groups) == [
+               %{provider: "ses", status: :pending},
+               %{provider: "smtp", status: :processing}
+             ]
+
+      assert_received {:reported, Job, :backlog,
+                       [
+                         {%{provider: "ses", status: :pending}, 2},
+                         {%{provider: "smtp", status: :processing}, 1}
+                       ]}
+
+      assert emitted(Job, :backlog) == []
+    end
+
+    test "reports an empty poll rather than zeroing a vanished group", %{backlog: backlog} do
+      known = [%{provider: "ses", status: :pending}]
+
+      assert Runner.emit(Job, backlog, known) == {:ok, []}
+
+      assert_received {:reported, Job, :backlog, []}
+      assert emitted(Job, :backlog) == []
+    end
+
+    test "reports nothing when the strategy fails", %{backlog: backlog} do
+      failing = %{backlog | strategy: Failing}
+
+      assert Runner.emit(Job, failing) == {:error, :no_database}
+
+      refute_received {:reported, _resource, _name, _groups}
+      assert emitted(Job, :backlog) == []
+    end
+
+    test "reports nothing when the strategy fails for one tenant only" do
+      backlog = %{Info.metric!(SchemaJob, :backlog) | strategy: FailingForOneTenant}
+
+      assert Runner.emit(SchemaJob, backlog) == {:error, {:unreachable, "tenant_b"}}
+
+      refute_received {:reported, _resource, _name, _groups}
+      assert emitted(SchemaJob, :backlog) == []
     end
   end
 

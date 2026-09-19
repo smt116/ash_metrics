@@ -29,6 +29,19 @@ defmodule AshMetrics.BackendTest.GaugeReporter do
   def polls_gauges?, do: true
 end
 
+defmodule AshMetrics.BackendTest.ValueReporter do
+  @moduledoc false
+  # A backend that takes the gauge values a poll collects.
+
+  @behaviour AshMetrics.Backend
+
+  @impl AshMetrics.Backend
+  def child_spec(_opts), do: :ignore
+
+  @impl AshMetrics.Backend
+  def report_gauge(_resource, _gauge, _groups), do: :ok
+end
+
 defmodule AshMetrics.BackendTest do
   # Swaps the configured backend, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
@@ -36,6 +49,7 @@ defmodule AshMetrics.BackendTest do
   alias AshMetrics.Backend
   alias AshMetrics.BackendTest.GaugeReporter
   alias AshMetrics.BackendTest.Reporter
+  alias AshMetrics.BackendTest.ValueReporter
   alias AshMetrics.Test.Invoice
 
   setup do
@@ -105,6 +119,24 @@ defmodule AshMetrics.BackendTest do
       Application.put_env(:ash_metrics, :backend, GaugeReporter)
 
       assert Backend.polls_gauges?()
+    end
+  end
+
+  describe "reports_gauges?/0" do
+    test "is false for a backend that does not implement the callback" do
+      Application.put_env(:ash_metrics, :backend, Reporter)
+
+      refute Backend.reports_gauges?()
+    end
+
+    test "is false for the default backend" do
+      refute Backend.reports_gauges?()
+    end
+
+    test "is true for a backend that implements the callback" do
+      Application.put_env(:ash_metrics, :backend, ValueReporter)
+
+      assert Backend.reports_gauges?()
     end
   end
 
