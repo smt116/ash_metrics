@@ -76,7 +76,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "whose closed tag :region is not an attribute of this resource"
+      assert message =~ "whose closed tag :region is neither an attribute of this resource"
       assert message =~ "no emission could ever carry it"
     end
 
@@ -84,6 +84,19 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
       assert errors(
                quote(do: counter(:transitions, tags: [:status, :region])),
                quote(do: change(AshMetrics.increment_on_change(:transitions, :status)))
+             ) == []
+    end
+
+    test "a closed tag that declares a path is read off the record" do
+      assert errors(
+               quote(
+                 do:
+                   counter(:transitions,
+                     tags: [:status, region: [path: [:location, :state], values: [:tx, :ca]]]
+                   )
+               ),
+               quote(do: change(AshMetrics.increment_on_change(:transitions, :status))),
+               [quote(do: attribute(:location, AshMetrics.Test.Location))]
              ) == []
     end
 
@@ -171,7 +184,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
                )
 
       assert Exception.message(error) =~
-               "whose closed tag :region is not an attribute of this resource"
+               "whose closed tag :region is neither an attribute of this resource"
     end
 
     test "a valid declaration produces no errors" do
@@ -295,8 +308,27 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "whose closed tag :region is not an attribute of this resource"
+      assert message =~ "whose closed tag :region is neither an attribute of this resource"
       assert message =~ "emit that distribution by hand"
+    end
+
+    test "a closed tag of the distribution may declare a path instead" do
+      assert errors(
+               quote(
+                 do:
+                   distribution(:time_to_resolve,
+                     unit: :millisecond,
+                     tags: [region: [path: [:location, :state], values: [:tx, :ca]]]
+                   )
+               ),
+               quote(
+                 do: change(AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at))
+               ),
+               [
+                 quote(do: attribute(:inserted_at, :utc_datetime_usec)),
+                 quote(do: attribute(:location, AshMetrics.Test.Location))
+               ]
+             ) == []
     end
 
     test "a valid declaration produces no errors" do

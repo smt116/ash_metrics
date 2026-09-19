@@ -20,10 +20,11 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   The two timestamps may be `DateTime` or `NaiveDateTime` values; a
   `NaiveDateTime` compared with a `DateTime` is read as UTC.
 
-  The observation carries every declared tag of the distribution that names an
-  attribute of the resource and is not `nil` on the record, and whatever the
-  configured `AshMetrics.TagExtractor` derives from the changeset's context,
-  its tenant, the resource and the action name.
+  The observation carries every declared tag of the distribution that is read
+  off the record — by attribute name, or at the `path:` the tag declares, as
+  `AshMetrics.Dsl.Tags` documents — and whatever the configured
+  `AshMetrics.TagExtractor` derives from the changeset's context, its tenant,
+  the resource and the action name.
 
   An observation `AshMetrics.observe/4` rejects is logged at error level with
   the resource, the action and the distribution; the action still succeeds.
@@ -89,7 +90,7 @@ defmodule AshMetrics.Changes.ObserveElapsed do
           changeset.resource,
           distribution.name,
           elapsed(to, from, unit!(distribution)),
-          tags: Emission.attribute_tags(changeset.resource, record, distribution.tags),
+          tags: Emission.record_tags(changeset.resource, record, distribution),
           metadata: Emission.metadata(changeset)
         )
       end

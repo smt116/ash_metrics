@@ -12,9 +12,10 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   it emits nothing, and it never alters the action's result.
 
   The emission carries the attribute as a tag, every other declared tag of the
-  counter that names an attribute of the resource and is not `nil` on the
-  record, and whatever the configured `AshMetrics.TagExtractor` derives from
-  the changeset's context, its tenant, the resource and the action name.
+  counter that is read off the record — by attribute name, or at the `path:`
+  the tag declares, as `AshMetrics.Dsl.Tags` documents — and whatever the
+  configured `AshMetrics.TagExtractor` derives from the changeset's context,
+  its tenant, the resource and the action name.
 
   Nothing is emitted when the counter declares the attribute as a closed tag
   and the new value is not one of the declared values.

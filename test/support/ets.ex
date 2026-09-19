@@ -13,6 +13,7 @@ defmodule AshMetrics.Test.Ets do
   alias Ash.DataLayer.Ets
   alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.Order
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
   alias AshMetrics.Test.Tenants
@@ -24,6 +25,7 @@ defmodule AshMetrics.Test.Ets do
     clear!(TenantJob)
     clear!(GlobalTenantJob)
     clear!(Ticket)
+    clear!(Order)
 
     Enum.each(Tenants.list_tenants(), &clear!(SchemaJob, &1))
   end

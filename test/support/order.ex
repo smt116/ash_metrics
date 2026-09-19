@@ -41,4 +41,31 @@ defmodule AshMetrics.Test.Order do
 
     attribute :shipped_at, :utc_datetime_usec, public?: true, allow_nil?: true
   end
+
+  actions do
+    defaults [:read, :destroy]
+
+    create :place do
+      accept [:status, :location]
+
+      change AshMetrics.increment_on_change(:placements, :status)
+    end
+
+    # Counts into the counter whose path tag is closed.
+    create :dispatch do
+      accept [:status, :location]
+
+      change AshMetrics.increment_on_write(:dispatches, :status)
+    end
+
+    update :ship do
+      require_atomic? false
+      accept [:status, :shipped_at]
+
+      change AshMetrics.observe_elapsed(:fulfillment_time,
+               from: :placed_at,
+               to: :shipped_at
+             )
+    end
+  end
 end

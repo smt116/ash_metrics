@@ -11,6 +11,7 @@ defmodule AshMetrics.Changes.Emission do
 
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Dsl.Counter
+  alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Info
 
   @doc false
@@ -47,14 +48,13 @@ defmodule AshMetrics.Changes.Emission do
   end
 
   @doc false
-  @spec attribute_tags(module(), Ash.Resource.record(), [atom()]) :: AshMetrics.tags()
-  def attribute_tags(resource, record, keys) do
-    keys
-    |> Enum.filter(&ResourceInfo.attribute(resource, &1))
-    |> Enum.reduce(%{}, fn key, tags ->
-      case Map.get(record, key) do
-        nil -> tags
-        value -> Map.put(tags, key, value)
+  @spec record_tags(module(), Ash.Resource.record(), Counter.t() | Distribution.t()) ::
+          AshMetrics.tags()
+  def record_tags(resource, record, metric) do
+    Enum.reduce(metric.tags, %{}, fn key, tags ->
+      case tag(resource, record, Map.get(metric.tag_paths, key, [key])) do
+        {:ok, value} -> Map.put(tags, key, value)
+        :error -> tags
       end
     end)
   end
@@ -105,9 +105,29 @@ defmodule AshMetrics.Changes.Emission do
           AshMetrics.tags()
   defp counter_tags(resource, record, counter, attribute, value) do
     resource
-    |> attribute_tags(record, counter.tags)
+    |> record_tags(record, counter)
     |> Map.put(attribute, value)
   end
+
+  @spec tag(module(), Ash.Resource.record(), [atom()]) :: {:ok, term()} | :error
+  defp tag(resource, record, [first | segments]) do
+    if ResourceInfo.attribute(resource, first) do
+      record |> Map.get(first) |> walk(segments)
+    else
+      :error
+    end
+  end
+
+  defp tag(_resource, _record, []), do: :error
+
+  @spec walk(term(), [atom()]) :: {:ok, term()} | :error
+  defp walk(nil, _segments), do: :error
+
+  defp walk(value, [segment | segments]) when is_map(value),
+    do: value |> Map.get(segment) |> walk(segments)
+
+  defp walk(value, []) when not is_map(value), do: {:ok, value}
+  defp walk(_value, _segments), do: :error
 
   @spec tenant(map(), term()) :: map()
   defp tenant(context, nil), do: context

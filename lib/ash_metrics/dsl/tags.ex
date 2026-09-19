@@ -20,14 +20,24 @@ defmodule AshMetrics.Dsl.Tags do
 
   A path is a list of at least one attribute name descending through the
   resource's embedded attributes: `[:location, :shipping_address, :state]`
-  names the `state` of the `shipping_address` of a record's `location`. The
-  action changes read the tag's value there, and `nil` at any segment leaves
-  the tag off the emission.
+  names the `state` of the `shipping_address` of a record's `location`.
 
   The key is the tag's name. It need not be an attribute of the resource, and
   a call site passing the tag to `AshMetrics.increment/3` or
   `AshMetrics.observe/4` by hand passes the value itself, whatever the path
   says. A gauge's `group_by` takes no path.
+
+  ## Reading a tag off the written record
+
+  `AshMetrics.Changes.IncrementOnChange`,
+  `AshMetrics.Changes.IncrementOnWrite` and
+  `AshMetrics.Changes.ObserveElapsed` read every declared tag from the record
+  their action wrote: one with a path at that path, and one without a path
+  from the attribute of the same name. A tag without a path that names no
+  attribute is left off, for the call site or the tag extractor to supply.
+
+  The tag is left off the emission when a segment of the walk is `nil`, and
+  when the value the walk arrives at is a map or a struct.
 
   Every form normalizes to the `tags`, `tag_values` and `tag_paths` fields of
   the declaration, so nothing downstream sees the difference.
