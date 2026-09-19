@@ -152,6 +152,24 @@ defmodule AshMetrics.Config do
   end
 
   @doc """
+  How long `AshMetrics.Backend.Otel` waits for one gauge to be counted.
+
+  In milliseconds, defaulting to 5000. A count that overruns it is killed;
+  see `AshMetrics.Backend.Otel`.
+
+      config :ash_metrics, AshMetrics.Backend.Otel, timeout: 5_000
+  """
+  @spec otel_timeout() :: pos_integer()
+  def otel_timeout, do: otel(:timeout, 5_000)
+
+  @spec otel(atom(), term()) :: term()
+  defp otel(key, default) do
+    @app
+    |> Application.get_env(AshMetrics.Backend.Otel, [])
+    |> Keyword.get(key, default)
+  end
+
+  @doc """
   The configured `AshMetrics.TenantSource`, or `nil` when there is none.
 
   There is no default: only an application that declares a gauge on a resource

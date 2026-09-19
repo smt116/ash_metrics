@@ -95,6 +95,7 @@ defmodule AshMetrics.MixProject do
         ],
         Defaults: [
           AshMetrics.Backend.Noop,
+          AshMetrics.Backend.Otel,
           AshMetrics.Gauge.Strategy.Count,
           AshMetrics.NameBuilder.Default,
           AshMetrics.Poller.AshOban,
