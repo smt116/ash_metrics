@@ -45,6 +45,14 @@ comment, in `lib/` and `test/` alike.
 - **Reference register, not blog.** No rhetorical openers or closers, no
   self-referential asides. A comment earns its place when deleting it would let
   a maintainer make a wrong change; otherwise delete it.
+- **The usage rules are exempt from one home.** `usage-rules.md` and
+  `usage-rules/` are consumer-facing and imperative, addressed to an agent
+  writing code with the package, and may restate facts documented elsewhere.
+  Every sentence in them must be true of the code at every commit;
+  `test/usage_rules_test.exs` checks the references they name, nothing more.
+
+Re-read `usage-rules.md` and `usage-rules/` with every behaviour change, and
+update what the change made wrong.
 
 ## Design principles
 
