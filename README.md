@@ -252,6 +252,9 @@ errors naming the gauge. Zeroing a drained group is weaker than with the timer,
 since an Oban job has no state between runs. See `AshMetrics.Poller.AshOban`
 for all of it, and for the private action and schedule it generates per gauge.
 
+No poller runs at all when the configured backend reports the gauges itself,
+whichever one a resource selects; see [OpenTelemetry](#opentelemetry).
+
 ### Multitenancy
 
 A gauge is tagged with `tenant` under either of Ash's multitenancy strategies.
@@ -307,6 +310,34 @@ With the default poller every node polls, so in a cluster each gauge is
 computed and emitted once per node per period; see
 `AshMetrics.Poller.GenServer`, [polling with Oban](#polling-with-oban), and
 `AshMetrics.Poller` for implementing anything else.
+
+### OpenTelemetry
+
+An application exporting through OpenTelemetry with the
+`otel_telemetry_metrics` bridge selects the backend that adapts the definitions
+for it:
+
+```elixir
+config :ash_metrics, backend: AshMetrics.Backend.Otel
+
+config :ash_metrics, AshMetrics.Backend.Otel,
+  timeout: 5_000
+```
+
+The bridge stays yours. Keep splicing `AshMetrics.metrics()` into the list you
+hand it:
+
+```elixir
+{OtelTelemetryMetrics, metrics: my_own_metrics() ++ AshMetrics.metrics()}
+```
+
+Counters and distributions go through the bridge, a declared `buckets` list
+carried on as the histogram's bucket boundaries. Gauges do not: the backend
+exports each one as an OpenTelemetry observable gauge, counted when the
+collector asks for a value and at most once per `period` per node, within
+`timeout` milliseconds. It therefore takes gauge polling over, so no poller is
+started and `AshMetrics.Poller.AshOban` must not be selected alongside it. See
+`AshMetrics.Backend.Otel`.
 
 ## Testing
 

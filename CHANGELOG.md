@@ -17,6 +17,18 @@ and this project adheres to
 - `mix ash_metrics.install` now prints how to select
   `AshMetrics.Poller.AshOban` when the application depends on `ash_oban`. It
   is a notice only; nothing is written to the configuration for it.
+- `AshMetrics.Backend.Otel`, for an application exporting through
+  OpenTelemetry with the `otel_telemetry_metrics` bridge. It drops the
+  gauges' last-value definitions, which the bridge rejects, carries a
+  distribution's declared buckets on as the histogram's bucket boundaries,
+  and reports the gauges as OpenTelemetry observable gauges counted on
+  demand. `mix ash_metrics.install` prints how to select it when the
+  application depends on the bridge.
+- `c:AshMetrics.Backend.polls_gauges?/0`, an optional callback with which a
+  backend declares that it reports the gauges itself. `AshMetrics.child_specs/1`
+  then starts no gauge poller, whatever its `:poll` option says.
+- `AshMetrics.Gauge.Runner.poll/2`, which computes one gauge's value per group
+  without emitting anything. `emit/3` is unchanged.
 
 ## [0.1.0] - 2026-09-18
 
