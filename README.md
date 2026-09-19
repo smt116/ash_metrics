@@ -326,6 +326,12 @@ The same list works for a Prometheus reporter:
 {TelemetryMetricsPrometheus, metrics: AshMetrics.metrics()}
 ```
 
+`:telemetry` detaches a handler that raises, so a bug in the reporter takes
+every metric that handler served silent, with nothing raised or logged by
+AshMetrics. Monitor the
+[`[:telemetry, :handler, :failure]`](https://hexdocs.pm/telemetry/telemetry.html#attach/4)
+event, or the reporter's own logs, to see it happen.
+
 `AshMetrics.Supervisor` starts whatever the configured backend needs, followed
 by every poller in use. Put it after your repository, since a gauge is answered
 by a query. `AshMetrics.child_specs/1` returns the same children as a list, for

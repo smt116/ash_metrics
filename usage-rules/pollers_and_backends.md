@@ -98,3 +98,10 @@ children = [
   AshMetrics.Supervisor
 ]
 ```
+
+## A failing reporter goes silent
+
+`:telemetry` detaches a handler that raises. A reporter bug therefore takes
+every metric that handler served silent, and AshMetrics raises and logs
+nothing. Monitor the `[:telemetry, :handler, :failure]` event, or the
+reporter's own logs, before trusting that a missing metric was never emitted.
