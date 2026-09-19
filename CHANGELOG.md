@@ -31,6 +31,15 @@ and this project adheres to
   then starts no gauge poller, whatever its `:poll` option says.
 - `AshMetrics.Gauge.Runner.poll/2`, which computes one gauge's value per group
   without emitting anything. `emit/3` is unchanged.
+- `AshMetrics.increment_on_write/2`, which counts every write of an attribute
+  rather than every change of it, and runs atomically. The action keeps
+  `require_atomic? true` and `Ash.bulk_update/4` needs no `strategy: :stream`.
+
+### Changed
+
+- `AshMetrics.observe_elapsed/2` now runs atomically, so an action carrying it
+  no longer needs `require_atomic? false`. A `where:` whose condition reads an
+  attribute still does.
 
 ## [0.1.0] - 2026-09-18
 

@@ -189,11 +189,26 @@ delivered. Both take their extractor metadata from the changeset, emit
 nothing when the action fails, and never alter its result. See
 `AshMetrics.Changes.IncrementOnChange` and `AshMetrics.Changes.ObserveElapsed`.
 
+`increment_on_write/2` counts every write of the attribute instead of every
+change of it, so a create counts and an update writing the same value again
+counts again:
+
+```elixir
+update :record_attempt do
+  accept [:status]
+
+  change AshMetrics.increment_on_write(:delivery, :status)
+end
+```
+
 Two caveats. A value outside a closed tag's declared set is skipped, so a
 status the counter does not enumerate is not counted and nothing is raised.
-And both changes refuse to run atomically: the action needs `require_atomic?
-false`, and `Ash.bulk_update/4` needs `:stream` among its strategies, or it
-emits nothing and returns `Ash.Error.Invalid.NoMatchingBulkStrategy`.
+And `increment_on_change/2` refuses to run atomically: the action needs
+`require_atomic? false`, and `Ash.bulk_update/4` needs `:stream` among its
+strategies, or it emits nothing and returns
+`Ash.Error.Invalid.NoMatchingBulkStrategy`. `increment_on_write/2` and
+`observe_elapsed/2` run atomically unless the `change` carries a `where:`
+whose condition reads an attribute, as the one above does.
 `Ash.bulk_create/4` needs nothing extra.
 
 ### Gauges
