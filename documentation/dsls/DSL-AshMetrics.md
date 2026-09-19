@@ -46,8 +46,8 @@ When the fact is written by an Ash action, `increment_on_change/2`,
 it from that action.
 
 A gauge is never emitted from a call site: `AshMetrics.Poller` polls it every
-`period` and emits one value per group, or the configured `AshMetrics.Backend`
-counts it itself when it reports gauges.
+`period` and emits one value per group, or hands those values to the
+configured `AshMetrics.Backend` when that backend takes them.
 
 A host application consumes `metrics/0`, the declarations of every resource
 compiled to `Telemetry.Metrics` definitions, ready to be spliced into

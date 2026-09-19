@@ -8,6 +8,35 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `c:AshMetrics.Backend.report_gauge/3`, an optional callback that takes the
+  result of every successful poll of a gauge in place of the `:telemetry`
+  events `AshMetrics.Gauge.Runner.emit/3` would execute. A failed poll
+  reports nothing, and no group is zeroed on the backend's behalf.
+- `AshMetrics.Backend.reports_gauges?/0`, which says whether the configured
+  backend implements that callback.
+
+### Changed
+
+- `AshMetrics.Backend.Otel` exports the values the configured
+  `AshMetrics.Poller` reports rather than counting a gauge when the collector
+  asks for one. Its observable gauges serve the last report for twice the
+  gauge's period, and the SDK exports no series for a gauge from a node that
+  has not been reported to. With `AshMetrics.Poller.AshOban` the cluster
+  therefore exports one series per gauge from one query per period, and with
+  the timer poller one of each per node. An application selecting this
+  backend must now let the pollers run.
+
+### Removed
+
+- `polls_gauges?/0` on `AshMetrics.Backend`, both the callback and the helper.
+  `AshMetrics.child_specs/1` starts the pollers whenever polling is on,
+  whatever the backend is.
+- `otel_timeout/0` on `AshMetrics.Config`, and the `timeout` key of
+  `config :ash_metrics, AshMetrics.Backend.Otel`, which counts nothing on
+  demand any more.
+
 ## [0.2.0] - 2026-09-19
 
 ### Added

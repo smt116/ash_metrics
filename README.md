@@ -273,9 +273,8 @@ errors naming the gauge. Zeroing a drained group is weaker than with the timer,
 since an Oban job has no state between runs. See `AshMetrics.Poller.AshOban`
 for all of it, and for the private action and schedule it generates per gauge.
 
-A backend that reports the gauges itself, such as `AshMetrics.Backend.Otel`,
-starts no poller process, but the Oban schedules of a resource that selects
-this poller still run. Do not combine the two; see
+With `AshMetrics.Backend.Otel`, the poll's result is exported from the node
+that ran the job, one series per gauge for the cluster; see
 [OpenTelemetry](#opentelemetry).
 
 ### Multitenancy
@@ -342,9 +341,6 @@ for it:
 
 ```elixir
 config :ash_metrics, backend: AshMetrics.Backend.Otel
-
-config :ash_metrics, AshMetrics.Backend.Otel,
-  timeout: 5_000
 ```
 
 The application keeps its own `OtelTelemetryMetrics` instance and splices
@@ -356,11 +352,10 @@ The application keeps its own `OtelTelemetryMetrics` instance and splices
 
 Counters and distributions go through the bridge; a declared `buckets` list is
 carried on as the histogram's bucket boundaries. Gauges do not: the backend
-exports each one as an OpenTelemetry observable gauge, counted when the
-collector asks for a value, at most once per `period` per node and within
-`timeout` milliseconds. The backend reports the gauges itself, so no poller
-process is started, and `AshMetrics.Poller.AshOban` must not be selected
-alongside it. See `AshMetrics.Backend.Otel`.
+exports each one as an OpenTelemetry observable gauge serving the values the
+configured poller reports to it. With `AshMetrics.Poller.AshOban` that is one
+query and one series per gauge for the whole cluster; with the default timer
+poller, one of each per node. See `AshMetrics.Backend.Otel`.
 
 ## Testing
 
