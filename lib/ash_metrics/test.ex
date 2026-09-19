@@ -33,10 +33,6 @@ defmodule AshMetrics.Test do
   concurrently will see both. Keep modules that use these assertions
   `async: false`, or scope them with `resources:` to metrics no async test
   emits.
-
-  This exists because the alternative is hand-rolled `:telemetry.attach/4`
-  calls in every test file, and that is enough friction to stop people
-  asserting on their metrics at all.
   """
 
   @assert_timeout 100

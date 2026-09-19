@@ -23,11 +23,12 @@ OTLP, StatsD, Prometheus, AppSignal. Counter emission is a synchronous
 
 ## Primitives
 
-- **`counter`** — "How many events? How fast?" Emitted manually at the business
-  moment the outcome becomes known.
+- **`counter`** — "How many events? How fast?" Emitted where the fact is
+  written: by hand with `increment/3`, or by an action change.
 - **`gauge`** — "How many right now?" Filled by a package-managed periodic poll
   over the resource.
-- **`distribution`** — "What's the spread?" Observed manually.
+- **`distribution`** — "What's the spread?" Observed by hand with `observe/4`,
+  or by `observe_elapsed/2` on an action.
 
 ## Installation
 
