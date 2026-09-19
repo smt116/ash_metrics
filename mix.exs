@@ -21,6 +21,7 @@ defmodule AshMetrics.MixProject do
       preferred_cli_env: ["test.integration": :test],
       package: package(),
       docs: docs(),
+      usage_rules: usage_rules(),
       dialyzer: [
         plt_core_path: "priv/plts",
         plt_file: {:no_warn, "priv/plts/ash_metrics.plt"},
@@ -121,6 +122,21 @@ defmodule AshMetrics.MixProject do
     ]
   end
 
+  # Read by `mix usage_rules.sync`, which rewrites the managed block at the end
+  # of `CLAUDE.md`.
+  defp usage_rules do
+    [
+      file: "CLAUDE.md",
+      usage_rules: [
+        {:ash, sub_rules: :all, link: :markdown},
+        {:spark, link: :markdown},
+        {:ash_oban, sub_rules: :all, link: :markdown},
+        {:ash_postgres, sub_rules: [], link: :markdown},
+        {:igniter, link: :markdown}
+      ]
+    ]
+  end
+
   defp aliases do
     [
       "spark.cheat_sheets": "spark.cheat_sheets --extensions AshMetrics",
@@ -163,6 +179,7 @@ defmodule AshMetrics.MixProject do
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
       {:ex_doc, "~> 0.40", only: :dev, runtime: false},
+      {:usage_rules, "~> 1.2", only: :dev, runtime: false},
       # Needed by `mix ash_metrics.install`, which a consumer runs through
       # `mix igniter.install ash_metrics`, and by the `spark.cheat_sheets`
       # task used to build the DSL reference. Optional, so that an
