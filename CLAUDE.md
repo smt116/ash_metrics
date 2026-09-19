@@ -54,6 +54,10 @@ comment, in `lib/` and `test/` alike.
 Re-read `usage-rules.md` and `usage-rules/` with every behaviour change, and
 update what the change made wrong.
 
+The managed block at the end of this file is written by `mix usage_rules.sync`
+from the `:usage_rules` key in `mix.exs`; never edit it by hand, and re-run the
+task after a dependency bump.
+
 ## Design principles
 
 These are decisions already made. Do not relitigate them in code.
@@ -90,3 +94,124 @@ These are decisions already made. Do not relitigate them in code.
 - **`before_action`/`after_action` telemetry is never a metrics source.** Ash's
   own docs warn against it: the cardinality is extremely high and there is no
   name to distinguish instances.
+
+<!-- usage-rules-start -->
+<!-- ash-start -->
+## ash usage
+_A declarative, extensible framework for building Elixir applications._
+
+[ash usage rules](deps/ash/usage-rules.md)
+<!-- ash-end -->
+<!-- ash:actions-start -->
+## ash:actions usage
+[ash:actions usage rules](deps/ash/usage-rules/actions.md)
+<!-- ash:actions-end -->
+<!-- ash:aggregates-start -->
+## ash:aggregates usage
+[ash:aggregates usage rules](deps/ash/usage-rules/aggregates.md)
+<!-- ash:aggregates-end -->
+<!-- ash:authorization-start -->
+## ash:authorization usage
+[ash:authorization usage rules](deps/ash/usage-rules/authorization.md)
+<!-- ash:authorization-end -->
+<!-- ash:calculations-start -->
+## ash:calculations usage
+[ash:calculations usage rules](deps/ash/usage-rules/calculations.md)
+<!-- ash:calculations-end -->
+<!-- ash:code_interfaces-start -->
+## ash:code_interfaces usage
+[ash:code_interfaces usage rules](deps/ash/usage-rules/code_interfaces.md)
+<!-- ash:code_interfaces-end -->
+<!-- ash:code_structure-start -->
+## ash:code_structure usage
+[ash:code_structure usage rules](deps/ash/usage-rules/code_structure.md)
+<!-- ash:code_structure-end -->
+<!-- ash:data_layers-start -->
+## ash:data_layers usage
+[ash:data_layers usage rules](deps/ash/usage-rules/data_layers.md)
+<!-- ash:data_layers-end -->
+<!-- ash:exist_expressions-start -->
+## ash:exist_expressions usage
+[ash:exist_expressions usage rules](deps/ash/usage-rules/exist_expressions.md)
+<!-- ash:exist_expressions-end -->
+<!-- ash:generating_code-start -->
+## ash:generating_code usage
+[ash:generating_code usage rules](deps/ash/usage-rules/generating_code.md)
+<!-- ash:generating_code-end -->
+<!-- ash:migrations-start -->
+## ash:migrations usage
+[ash:migrations usage rules](deps/ash/usage-rules/migrations.md)
+<!-- ash:migrations-end -->
+<!-- ash:query_filter-start -->
+## ash:query_filter usage
+[ash:query_filter usage rules](deps/ash/usage-rules/query_filter.md)
+<!-- ash:query_filter-end -->
+<!-- ash:querying_data-start -->
+## ash:querying_data usage
+[ash:querying_data usage rules](deps/ash/usage-rules/querying_data.md)
+<!-- ash:querying_data-end -->
+<!-- ash:relationships-start -->
+## ash:relationships usage
+[ash:relationships usage rules](deps/ash/usage-rules/relationships.md)
+<!-- ash:relationships-end -->
+<!-- ash:testing-start -->
+## ash:testing usage
+[ash:testing usage rules](deps/ash/usage-rules/testing.md)
+<!-- ash:testing-end -->
+<!-- spark-start -->
+## spark usage
+_Generic tooling for building DSLs_
+
+[spark usage rules](deps/spark/usage-rules.md)
+<!-- spark-end -->
+<!-- ash_oban-start -->
+## ash_oban usage
+_The extension for integrating Ash resources with Oban._
+
+[ash_oban usage rules](deps/ash_oban/usage-rules.md)
+<!-- ash_oban-end -->
+<!-- ash_oban:best_practices-start -->
+## ash_oban:best_practices usage
+[ash_oban:best_practices usage rules](deps/ash_oban/usage-rules/best_practices.md)
+<!-- ash_oban:best_practices-end -->
+<!-- ash_oban:debugging_and_error_handling-start -->
+## ash_oban:debugging_and_error_handling usage
+[ash_oban:debugging_and_error_handling usage rules](deps/ash_oban/usage-rules/debugging_and_error_handling.md)
+<!-- ash_oban:debugging_and_error_handling-end -->
+<!-- ash_oban:defining_triggers-start -->
+## ash_oban:defining_triggers usage
+[ash_oban:defining_triggers usage rules](deps/ash_oban/usage-rules/defining_triggers.md)
+<!-- ash_oban:defining_triggers-end -->
+<!-- ash_oban:multi_tenancy_support-start -->
+## ash_oban:multi_tenancy_support usage
+[ash_oban:multi_tenancy_support usage rules](deps/ash_oban/usage-rules/multi_tenancy_support.md)
+<!-- ash_oban:multi_tenancy_support-end -->
+<!-- ash_oban:scheduled_actions-start -->
+## ash_oban:scheduled_actions usage
+[ash_oban:scheduled_actions usage rules](deps/ash_oban/usage-rules/scheduled_actions.md)
+<!-- ash_oban:scheduled_actions-end -->
+<!-- ash_oban:setting_up_ash_oban-start -->
+## ash_oban:setting_up_ash_oban usage
+[ash_oban:setting_up_ash_oban usage rules](deps/ash_oban/usage-rules/setting_up_ash_oban.md)
+<!-- ash_oban:setting_up_ash_oban-end -->
+<!-- ash_oban:triggering_jobs_programmatically-start -->
+## ash_oban:triggering_jobs_programmatically usage
+[ash_oban:triggering_jobs_programmatically usage rules](deps/ash_oban/usage-rules/triggering_jobs_programmatically.md)
+<!-- ash_oban:triggering_jobs_programmatically-end -->
+<!-- ash_oban:working_with_actors-start -->
+## ash_oban:working_with_actors usage
+[ash_oban:working_with_actors usage rules](deps/ash_oban/usage-rules/working_with_actors.md)
+<!-- ash_oban:working_with_actors-end -->
+<!-- ash_postgres-start -->
+## ash_postgres usage
+_The PostgreSQL data layer for Ash Framework_
+
+[ash_postgres usage rules](deps/ash_postgres/usage-rules.md)
+<!-- ash_postgres-end -->
+<!-- igniter-start -->
+## igniter usage
+_A code generation and project patching framework_
+
+[igniter usage rules](deps/igniter/usage-rules.md)
+<!-- igniter-end -->
+<!-- usage-rules-end -->
