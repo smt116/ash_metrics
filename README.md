@@ -132,11 +132,26 @@ metric name rather than one name per value. An entry written `key` is open, and
 a call site may pass any value or none at all. A distribution's value is
 measured by the call site, not by the package.
 
+An entry written `key: [path: [...]]` says where in the written record the
+action changes below read the tag's value, descending through embedded
+attributes; add `values:` to close it as well. The key is the tag's name, not
+an attribute name, and `nil` at any segment of the path leaves the tag off the
+emission.
+
+```elixir
+counter :placement,
+  tags: [
+    state: [path: [:location, :state]],
+    shipping_state: [path: [:location, :shipping_address, :state], values: [:tx, :ca]]
+  ]
+```
+
 The declarations themselves are checked while the resource compiles: metric
 names must be unique, tag keys must be unique and must not collide with the
 keys the tag extractor adds, a closed tag needs at least one value and no
-duplicates, and buckets must be strictly ascending positive numbers. Spark
-reports a failed check as a compiler warning pointing at the offending
+duplicates, a `path:` must reach a single value through the resource's
+embedded attributes, and buckets must be strictly ascending positive numbers.
+Spark reports a failed check as a compiler warning pointing at the offending
 declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
 declaration should fail the build.
 
@@ -188,11 +203,11 @@ end
 `increment_on_change/2` counts one `delivery` after the transaction whenever
 the action leaves `status` holding a value the record did not have before,
 tagged with that value and with every other declared tag of the counter that
-names an attribute of the record. `observe_elapsed/2` records the time
-between two timestamps of the written record into `delivery_time`, in that
-distribution's unit; `where:` narrows it to the one transition that means
-delivered. Both take their extractor metadata from the changeset, emit
-nothing when the action fails, and never alter its result. See
+names an attribute of the record or a `path:` into one. `observe_elapsed/2`
+records the time between two timestamps of the written record into
+`delivery_time`, in that distribution's unit; `where:` narrows it to the one
+transition that means delivered. Both take their extractor metadata from the
+changeset, emit nothing when the action fails, and never alter its result. See
 `AshMetrics.Changes.IncrementOnChange` and `AshMetrics.Changes.ObserveElapsed`.
 
 `increment_on_write/2` counts every write of the attribute instead of every

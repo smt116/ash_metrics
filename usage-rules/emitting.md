@@ -89,10 +89,11 @@ silently** when the counter does not declare it; `AshMetrics.increment/3` and
 `AshMetrics.observe/4` raise `ArgumentError` instead. Enumerate every value
 the attribute can hold, or the counter quietly undercounts.
 
-The changes read every other tag off the record's attributes of the same
-name, so a closed tag on such a counter must name an attribute of the
-resource. A verifier rejects the resource otherwise, because no emission
-from a change could ever carry that tag.
+The changes read every other tag off the record: an attribute of the same
+name, or the `path:` the tag declares. A closed tag on such a counter must be
+one or the other, or no emission from a change could ever carry it, and a
+verifier rejects the resource. A tag whose value on the record is `nil`, a
+map or a struct is left off the emission.
 
 Never count an action returning `{:ok, _}` as a business outcome. An ok tuple
 means the function returned; the email being delivered, the invoice being

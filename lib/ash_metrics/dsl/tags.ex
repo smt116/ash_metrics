@@ -16,6 +16,9 @@ defmodule AshMetrics.Dsl.Tags do
       tags: [{:status, [:queued, :sent, :error]}, :provider]
       tags: [state: [path: [:location, :state], values: [:tx, :ca]]]
 
+  Every form normalizes to the `tags`, `tag_values` and `tag_paths` fields of
+  the declaration, so nothing downstream sees the difference.
+
   ## Paths
 
   A path is a list of at least one attribute name descending through the
@@ -41,9 +44,6 @@ defmodule AshMetrics.Dsl.Tags do
 
   `AshMetrics.Verifiers.VerifyMetrics` checks a path against the resource's
   attributes while it compiles.
-
-  Every form normalizes to the `tags`, `tag_values` and `tag_paths` fields of
-  the declaration, so nothing downstream sees the difference.
   """
 
   alias AshMetrics.Dsl.Counter

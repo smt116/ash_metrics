@@ -10,6 +10,21 @@ and this project adheres to
 
 ### Added
 
+- A path on a `counter`'s or a `distribution`'s tag, written
+  `state: [path: [:location, :state]]` and optionally carrying `values:` to
+  close the tag as well. `AshMetrics.Changes.IncrementOnChange`,
+  `AshMetrics.Changes.IncrementOnWrite` and
+  `AshMetrics.Changes.ObserveElapsed` read the tag's value from the record
+  they wrote by descending it through the path's embedded attributes, and
+  leave the tag off the emission when a segment is `nil`. A verifier walks
+  the path against the resource's attributes while it compiles. A call site
+  passing that tag by hand passes the value itself, as for any other tag.
+- A verifier rejection of a tag that declares no path and names an attribute
+  whose type is an embedded resource, a map, a struct or a keyword list. The
+  action changes can only read a single value off the record, so such a tag
+  never reached an emission. This is a new compiler warning on a declaration
+  that used to pass: give the tag a `path:` into that attribute, or name the
+  value a call site passes instead.
 - `suffix:` on a `distribution`, the last segment of its metric name.
   `AshMetrics.Dsl.Distribution.default_suffix/1` derives it from the declared
   `unit` when it is absent, and a verifier rejects a suffix that is empty or
@@ -23,6 +38,10 @@ and this project adheres to
 
 ### Changed
 
+- The action changes no longer carry a tag whose value on the record is a map
+  or a struct. A datetime attribute declared as a tag was emitted as the
+  `DateTime` itself and is now left off; a call site may still pass any value
+  for that tag by hand.
 - A distribution whose `unit` is neither a time unit nor a byte unit is now
   named `.value`, where it was named `.duration`. A distribution declaring a
   time unit or a conversion tuple keeps `.duration`, and one declaring
