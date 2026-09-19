@@ -39,6 +39,12 @@ if Code.ensure_loaded?(:otel_meter) do
     query per period. With `AshMetrics.Poller.GenServer` every node polls and
     exports its own series.
 
+    When a poll moves to another node, the previous node keeps serving its
+    last report for the rest of its window, so both nodes export the gauge for
+    up to one period. Each series carries the resource attributes of the node
+    that exports it, such as its host; a query that follows a gauge across
+    nodes aggregates over those attributes.
+
     Tag values reach OpenTelemetry as attributes: an atom, a binary, a number
     or a boolean as it is, a struct not at all, and anything else inspected.
 

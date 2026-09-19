@@ -5,7 +5,10 @@ defmodule AshMetrics.Poller.AshOban.Memory do
   `AshMetrics.Gauge.Runner` zeroes a group that the previous poll found and
   this one did not, so something has to hold those groups between polls.
   `AshMetrics.Poller.GenServer` keeps them in its own process state; an Oban
-  job has no state between runs, and this module is the substitute for it.
+  job has no state between runs, and this module is the substitute for it. It
+  is written on every successful poll and read only on the `:telemetry` path;
+  a backend implementing `c:AshMetrics.Backend.report_gauge/3` zeroes vanished
+  groups itself.
 
   ## What this does not promise
 

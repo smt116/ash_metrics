@@ -233,7 +233,9 @@ Sub-minute periods are usually wasted resolution: most collectors flush on a
 ten second interval anyway, and every poll costs the queries above.
 
 A group that disappears is emitted once as a zero, so a drained backlog does
-not keep reporting its last value; see `AshMetrics.Gauge.Runner`.
+not keep reporting its last value; see `AshMetrics.Gauge.Runner`. A backend
+that takes the poll's result, such as `AshMetrics.Backend.Otel`, zeroes it
+itself.
 
 ### Polling with Oban
 
@@ -274,7 +276,8 @@ since an Oban job has no state between runs. See `AshMetrics.Poller.AshOban`
 for all of it, and for the private action and schedule it generates per gauge.
 
 With `AshMetrics.Backend.Otel`, the poll's result is exported from the node
-that ran the job, one series per gauge for the cluster; see
+that ran the job, one series per gauge for the cluster, and drained groups are
+zeroed by the backend, not by that memory; see
 [OpenTelemetry](#opentelemetry).
 
 ### Multitenancy
@@ -355,7 +358,10 @@ carried on as the histogram's bucket boundaries. Gauges do not: the backend
 exports each one as an OpenTelemetry observable gauge serving the values the
 configured poller reports to it. With `AshMetrics.Poller.AshOban` that is one
 query and one series per gauge for the whole cluster; with the default timer
-poller, one of each per node. See `AshMetrics.Backend.Otel`.
+poller, one of each per node. A series carries the exporting node's resource
+attributes, so aggregate over `host` when querying, and when the poll moves to
+another node both export it for up to one period. See
+`AshMetrics.Backend.Otel`.
 
 ## Testing
 

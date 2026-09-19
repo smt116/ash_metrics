@@ -70,7 +70,9 @@ defmodule AshMetrics.Poller.AshOban do
   Zeroing a group that has drained means remembering the groups the previous
   poll found, and an Oban job has no state between runs.
   `AshMetrics.Poller.AshOban.Memory` holds that per node and best effort; see
-  that module for the limits.
+  that module for the limits. A backend implementing
+  `c:AshMetrics.Backend.report_gauge/3` takes the groups instead and zeroes
+  vanished ones itself; the memory is not consulted then.
   """
 
   @behaviour AshMetrics.Poller
