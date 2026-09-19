@@ -383,11 +383,22 @@ defmodule AshMetrics do
   `opts` are passed to both. An application that declares no gauges and runs
   the default backend still gets the poller's process, which sits idle.
 
+  A `:poll` option overrides `AshMetrics.Config.poll?/0`, and is not passed
+  on; `false` leaves out every poller's children.
+
   `AshMetrics.Supervisor` supervises exactly this, for an application that
   would rather add one child than splice a list.
   """
   @spec child_specs(keyword()) :: [Supervisor.child_spec()]
-  def child_specs(opts \\ []), do: Backend.child_specs(opts) ++ Poller.child_specs(opts)
+  def child_specs(opts \\ []) do
+    {poll?, opts} = Keyword.pop(opts, :poll, Config.poll?())
+
+    Backend.child_specs(opts) ++ poller_child_specs(poll?, opts)
+  end
+
+  @spec poller_child_specs(boolean(), keyword()) :: [Supervisor.child_spec()]
+  defp poller_child_specs(true, opts), do: Poller.child_specs(opts)
+  defp poller_child_specs(false, _opts), do: []
 
   @doc """
   The `Telemetry.Metrics` definitions of every resource that declares metrics.

@@ -64,6 +64,14 @@ defmodule AshMetrics.SupervisorTest do
              AshMetrics.child_specs() |> Enum.map(& &1.id) |> Enum.sort()
   end
 
+  test "supervises the backend alone when polling is off" do
+    Application.put_env(:ash_metrics, :backend, Reporter)
+
+    pid = start_supervised!({AshMetrics.Supervisor, poll: false})
+
+    assert ids(pid) == [Reporter]
+  end
+
   test "registers under an explicit name" do
     pid = start_supervised!({AshMetrics.Supervisor, name: AshMetrics.SupervisorTest.Named})
 

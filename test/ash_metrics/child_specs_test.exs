@@ -19,13 +19,15 @@ defmodule AshMetrics.ChildSpecsTest do
   alias AshMetrics.Poller
 
   setup do
-    original = Application.get_env(:ash_metrics, :backend)
+    original = Application.get_all_env(:ash_metrics)
 
     on_exit(fn ->
-      case original do
-        nil -> Application.delete_env(:ash_metrics, :backend)
-        backend -> Application.put_env(:ash_metrics, :backend, backend)
-      end
+      Enum.each([:backend, :poll], fn key ->
+        case Keyword.fetch(original, key) do
+          {:ok, value} -> Application.put_env(:ash_metrics, key, value)
+          :error -> Application.delete_env(:ash_metrics, key)
+        end
+      end)
     end)
 
     :ok
@@ -55,6 +57,37 @@ defmodule AshMetrics.ChildSpecsTest do
 
     assert state.() == [name: :metrics]
     assert Keyword.fetch!(args, :name) == :metrics
+  end
+
+  test "is the backend alone when polling is off" do
+    Application.put_env(:ash_metrics, :backend, Reporter)
+    Application.put_env(:ash_metrics, :poll, false)
+
+    assert [%{id: Reporter}] = AshMetrics.child_specs()
+  end
+
+  test "is the backend alone when the options turn polling off" do
+    Application.put_env(:ash_metrics, :backend, Reporter)
+
+    assert [%{id: Reporter}] = AshMetrics.child_specs(poll: false)
+  end
+
+  test "polls when the options turn polling on against the configuration" do
+    Application.put_env(:ash_metrics, :poll, false)
+
+    assert [
+             %{id: AshMetrics.Poller.GenServer},
+             %{id: AshMetrics.Test.MarkerPoller}
+           ] = AshMetrics.child_specs(poll: true)
+  end
+
+  test "does not pass the polling switch on to the backend" do
+    Application.put_env(:ash_metrics, :backend, Reporter)
+
+    assert [%{start: {Agent, :start_link, [state]}} | _rest] =
+             AshMetrics.child_specs(name: :metrics, poll: true)
+
+    assert state.() == [name: :metrics]
   end
 
   test "returns specs a supervisor can actually start" do

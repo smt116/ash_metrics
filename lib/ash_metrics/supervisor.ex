@@ -16,6 +16,9 @@ defmodule AshMetrics.Supervisor do
 
   With the default `AshMetrics.Backend.Noop` and no gauges declared anywhere,
   the only thing under it is the timer poller's process, sitting idle.
+
+  `poll: false`, here or in the configuration, leaves the pollers out; see
+  `AshMetrics.Config.poll?/0`.
   """
 
   use Supervisor

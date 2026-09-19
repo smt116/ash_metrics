@@ -16,6 +16,7 @@ defmodule AshMetrics.ConfigTest do
           :tag_extractor,
           :backend,
           :poller,
+          :poll,
           :tenant_source
         ],
         fn key ->
@@ -149,6 +150,10 @@ defmodule AshMetrics.ConfigTest do
     test "poller/0 defaults to the bundled GenServer poller" do
       assert Config.poller() == AshMetrics.Poller.GenServer
     end
+
+    test "poll?/0 defaults to polling" do
+      assert Config.poll?() == true
+    end
   end
 
   describe "overrides" do
@@ -174,6 +179,12 @@ defmodule AshMetrics.ConfigTest do
       Application.put_env(:ash_metrics, :poller, MyApp.Poller)
 
       assert Config.poller() == MyApp.Poller
+    end
+
+    test "poll?/0 can be turned off" do
+      Application.put_env(:ash_metrics, :poll, false)
+
+      assert Config.poll?() == false
     end
   end
 end

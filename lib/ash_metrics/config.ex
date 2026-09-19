@@ -11,7 +11,8 @@ defmodule AshMetrics.Config do
         name_builder: AshMetrics.NameBuilder.Default,
         tag_extractor: AshMetrics.TagExtractor.Default,
         backend: AshMetrics.Backend.Noop,
-        poller: AshMetrics.Poller.GenServer
+        poller: AshMetrics.Poller.GenServer,
+        poll: true
 
   `tenant_source` has no default and is not required either: it is needed only
   by an application that declares a gauge on a resource which has to be polled
@@ -107,6 +108,18 @@ defmodule AshMetrics.Config do
   """
   @spec poller() :: module()
   def poller, do: Application.get_env(@app, :poller, AshMetrics.Poller.GenServer)
+
+  @doc """
+  Whether the pollers of the declared gauges are started. Defaults to `true`.
+
+  With `false`, `AshMetrics.child_specs/1` returns no poller's children and no
+  gauge is polled; the backend's children and the compiled metric definitions
+  are the same either way.
+
+      config :ash_metrics, poll: false
+  """
+  @spec poll?() :: boolean()
+  def poll?, do: Application.get_env(@app, :poll, true)
 
   @doc """
   The Oban queue the gauges polled by `AshMetrics.Poller.AshOban` run in.
