@@ -99,6 +99,14 @@ An open tag filled this way carries whatever the row holds, one timeseries
 per distinct value. Name a bounded attribute, or close it with `values:`;
 never an identifier, a free-text column or anything a user typed.
 
+The changes emit after the action's transaction commits, unless the
+changeset is built inside a transaction that is already open, such as an
+action called from another action's hook. Then they emit before that
+transaction commits, and a later rollback does not retract the emission, not
+even one caused by a later `after_action` hook failing the action itself; do
+not expect a change's count to roll back with a surrounding transaction or
+with the action.
+
 Never count an action returning `{:ok, _}` as a business outcome. An ok tuple
 means the function returned; the email being delivered, the invoice being
 captured or the sync completing is a fact that usually arrives later, in a

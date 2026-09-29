@@ -5,11 +5,12 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   Declare it with `AshMetrics.increment_on_change/2` on the action that writes
   the attribute.
 
-  The change registers an `Ash.Changeset.after_transaction/2` hook. On
-  `{:ok, record}` it compares the attribute's value on the record with the
-  changeset's original data and emits one count through `AshMetrics.increment/3`
-  when the two differ; a create emits once for the value it wrote. On an error
-  it emits nothing, and it never alters the action's result.
+  Once the action succeeds, the change compares the attribute's value on the
+  record with the changeset's original data and emits one count through
+  `AshMetrics.increment/3` when the two differ; a create emits once for the
+  value it wrote. An action that fails emits nothing, except as
+  "Transactions" below describes, and the change never alters the action's
+  result.
 
   The emission carries the attribute as a tag, every other declared tag of the
   counter that is read off the record — by attribute name, or at the `path:`
@@ -23,6 +24,24 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   An emission that raises, throws or exits, whether `AshMetrics.increment/3`
   rejects it or the tag extractor fails, is logged at error level with the
   resource, the action and the counter; the action's result is never altered.
+
+  ## Transactions
+
+  When the change emits depends on whether a transaction is open when the
+  change runs, which is when the changeset is built, not when the action runs:
+
+  * Built outside a transaction, the changeset carries an
+    `Ash.Changeset.after_transaction/2` hook, and the emission happens after
+    the action's transaction commits.
+  * Built inside an open transaction, the changeset carries an
+    `Ash.Changeset.after_action/2` hook, and the emission happens before the
+    surrounding transaction commits. A later rollback, of the surrounding
+    transaction or of the action because a later `after_action` hook failed,
+    does not retract the emission.
+
+  A changeset built outside a transaction and run inside one keeps the
+  `after_transaction` hook, and Ash logs its warning about transaction hooks
+  running inside a transaction.
 
   ## Atomics
 
@@ -49,11 +68,7 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   @impl Ash.Resource.Change
   @spec change(Changeset.t(), keyword(), Ash.Resource.Change.Context.t()) :: Changeset.t()
   def change(changeset, opts, _context) do
-    Changeset.after_transaction(changeset, fn changeset, result ->
-      increment(changeset, opts, result)
-
-      result
-    end)
+    Emission.on_success(changeset, &increment(&1, opts, &2))
   end
 
   @impl Ash.Resource.Change
@@ -65,8 +80,8 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   @spec atomic?() :: false
   def atomic?, do: false
 
-  @spec increment(Changeset.t(), keyword(), term()) :: :ok
-  defp increment(changeset, opts, {:ok, record}) do
+  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  defp increment(changeset, opts, record) do
     Emission.emit(changeset, opts[:counter], fn ->
       attribute = opts[:attribute]
 
@@ -77,8 +92,6 @@ defmodule AshMetrics.Changes.IncrementOnChange do
       end
     end)
   end
-
-  defp increment(_changeset, _opts, _result), do: :ok
 
   @spec changed?(Changeset.t(), atom(), term()) :: boolean()
   defp changed?(%Changeset{action_type: :create}, _attribute, _value), do: true

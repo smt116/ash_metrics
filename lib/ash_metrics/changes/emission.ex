@@ -4,11 +4,12 @@ defmodule AshMetrics.Changes.Emission do
   # `AshMetrics.Changes.IncrementOnWrite` and `AshMetrics.Changes.ObserveElapsed`
   # share: option validation for `init/1`, the metadata handed to the tag
   # extractor, the tags read off the resulting record, the count the two
-  # increment changes emit, and the wrapper that turns a failed emission into a
-  # log line.
+  # increment changes emit, the hook that runs an emission once the action
+  # succeeds, and the wrapper that turns a failed emission into a log line.
 
   require Logger
 
+  alias Ash.Changeset
   alias Ash.Resource.Info, as: ResourceInfo
   alias AshMetrics.Dsl.Counter
   alias AshMetrics.Dsl.Distribution
@@ -74,6 +75,34 @@ defmodule AshMetrics.Changes.Emission do
     end
 
     :ok
+  end
+
+  @doc """
+  Registers a hook that calls `fun` with the changeset and the written record
+  once the action succeeds, and leaves the action's result unchanged. The hook
+  is chosen when this runs, from whether a transaction is open; the timing each
+  gives is documented in `AshMetrics.Changes.IncrementOnChange`, "Transactions".
+  """
+  @spec on_success(Changeset.t(), (Changeset.t(), Ash.Resource.record() -> :ok)) ::
+          Changeset.t()
+  def on_success(changeset, fun) do
+    if Ash.DataLayer.in_transaction?(changeset.resource) do
+      Changeset.after_action(changeset, fn changeset, record ->
+        fun.(changeset, record)
+
+        {:ok, record}
+      end)
+    else
+      Changeset.after_transaction(changeset, fn
+        changeset, {:ok, record} = result ->
+          fun.(changeset, record)
+
+          result
+
+        _changeset, result ->
+          result
+      end)
+    end
   end
 
   @doc false

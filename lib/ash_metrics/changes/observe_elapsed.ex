@@ -6,12 +6,14 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   Declare it with `AshMetrics.observe_elapsed/2` on the action that writes the
   later timestamp.
 
-  The change registers an `Ash.Changeset.after_transaction/2` hook. On
-  `{:ok, record}` it observes `to - from` through `AshMetrics.observe/4`, in
-  the distribution's declared `unit`, which must be one of
-  `AshMetrics.Dsl.Distribution.time_units/0`. `to` defaults to `:now`, the
-  moment the hook runs. A negative result is observed as it is. On an error it
-  observes nothing, and it never alters the action's result.
+  Once the action succeeds, the change observes `to - from` through
+  `AshMetrics.observe/4`, in the distribution's declared `unit`, which must be
+  one of `AshMetrics.Dsl.Distribution.time_units/0`. `to` defaults to `:now`,
+  the moment the hook runs. A negative result is observed as it is. An
+  action that fails observes nothing, and the change never alters the
+  action's result. When it observes within a transaction, including the one
+  case in which a failing action still observes, is that of
+  `AshMetrics.Changes.IncrementOnChange`, "Transactions".
 
   Nothing is observed when either timestamp is `nil` on the record. Restrict
   the change to a particular transition with `where:` on the `change`
@@ -64,11 +66,7 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   @impl Ash.Resource.Change
   @spec change(Changeset.t(), keyword(), Ash.Resource.Change.Context.t()) :: Changeset.t()
   def change(changeset, opts, _context) do
-    Changeset.after_transaction(changeset, fn changeset, result ->
-      observe(changeset, opts, result)
-
-      result
-    end)
+    Emission.on_success(changeset, &observe(&1, opts, &2))
   end
 
   @impl Ash.Resource.Change
@@ -80,8 +78,8 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   @spec atomic?() :: true
   def atomic?, do: true
 
-  @spec observe(Changeset.t(), keyword(), term()) :: :ok
-  defp observe(changeset, opts, {:ok, record}) do
+  @spec observe(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  defp observe(changeset, opts, record) do
     Emission.emit(changeset, opts[:distribution], fn ->
       distribution = Info.metric!(changeset.resource, opts[:distribution])
       from = Map.get(record, opts[:from])
@@ -100,8 +98,6 @@ defmodule AshMetrics.Changes.ObserveElapsed do
       :ok
     end)
   end
-
-  defp observe(_changeset, _opts, _result), do: :ok
 
   @spec to(Ash.Resource.record(), atom()) :: DateTime.t() | NaiveDateTime.t() | nil
   defp to(_record, :now), do: DateTime.utc_now()

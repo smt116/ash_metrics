@@ -16,6 +16,11 @@ and this project adheres to
   while emitting, such as one from a failing `AshMetrics.TagExtractor`, and
   leave the action's result alone. Only an `ArgumentError` was logged
   before; anything else failed the action.
+- An action whose changeset is built inside an open transaction, such as one
+  called from another action's hook, no longer makes Ash log its warning
+  about `after_transaction` hooks running inside a transaction. There, an
+  action that fails in a later `after_action` hook now still emits; see
+  `AshMetrics.Changes.IncrementOnChange`.
 
 ## [0.4.0] - 2026-09-19
 

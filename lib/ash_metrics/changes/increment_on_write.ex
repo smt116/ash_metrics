@@ -6,13 +6,13 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   the attribute; that function states what it counts that
   `AshMetrics.increment_on_change/2` does not.
 
-  The change registers an `Ash.Changeset.after_transaction/2` hook. On
-  `{:ok, record}` it emits one count through `AshMetrics.increment/3` for the
-  attribute's value on the record. On an error it emits nothing, and it never
-  alters the action's result.
+  Once the action succeeds, the change emits one count through
+  `AshMetrics.increment/3` for the attribute's value on the record. An action
+  that fails emits nothing, and the change never alters the action's result.
 
-  The tags the emission carries, the closed-tag value it skips and the logging
-  of an emission that fails are those of
+  The tags the emission carries, the closed-tag value it skips, the logging of
+  an emission that fails and when it emits within a transaction, including the
+  one case in which a failing action still emits, are those of
   `AshMetrics.Changes.IncrementOnChange`.
 
   ## Atomics
@@ -35,11 +35,7 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   @impl Ash.Resource.Change
   @spec change(Changeset.t(), keyword(), Ash.Resource.Change.Context.t()) :: Changeset.t()
   def change(changeset, opts, _context) do
-    Changeset.after_transaction(changeset, fn changeset, result ->
-      increment(changeset, opts, result)
-
-      result
-    end)
+    Emission.on_success(changeset, &increment(&1, opts, &2))
   end
 
   @impl Ash.Resource.Change
@@ -51,10 +47,8 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   @spec atomic?() :: true
   def atomic?, do: true
 
-  @spec increment(Changeset.t(), keyword(), term()) :: :ok
-  defp increment(changeset, opts, {:ok, record}) do
+  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  defp increment(changeset, opts, record) do
     Emission.emit(changeset, opts[:counter], fn -> Emission.count(changeset, opts, record) end)
   end
-
-  defp increment(_changeset, _opts, _result), do: :ok
 end

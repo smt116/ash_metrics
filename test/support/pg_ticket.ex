@@ -66,6 +66,19 @@ defmodule AshMetrics.Test.PgTicket do
              where: [attribute_equals(:status, :resolved)]
     end
 
+    # `:update_status`'s counter, followed by an `after_action` hook that fails
+    # the action after the counter's hook ran.
+    update :update_status_then_fail do
+      require_atomic? false
+      accept [:status]
+
+      change AshMetrics.increment_on_change(:transitions, :status)
+
+      change after_action(fn _changeset, _record, _context ->
+               {:error, "failed after the write"}
+             end)
+    end
+
     # Both atomic-capable changes on one action that keeps Ash's default
     # `require_atomic? true`.
     update :resolve do
