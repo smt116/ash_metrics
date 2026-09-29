@@ -83,14 +83,18 @@ defmodule AshMetrics.Changes.Emission do
 
     :ok
   rescue
-    error in ArgumentError ->
-      Logger.error(
-        "AshMetrics did not emit #{inspect(metric)} on " <>
-          "#{inspect(changeset.resource)} from action " <>
-          "#{inspect(changeset.action.name)}: #{Exception.message(error)}"
-      )
+    error -> log_failure(changeset, metric, Exception.message(error))
+  catch
+    kind, reason -> log_failure(changeset, metric, Exception.format_banner(kind, reason))
+  end
 
-      :ok
+  @spec log_failure(Ash.Changeset.t(), atom(), String.t()) :: :ok
+  defp log_failure(changeset, metric, message) do
+    Logger.error(
+      "AshMetrics did not emit #{inspect(metric)} on " <>
+        "#{inspect(changeset.resource)} from action " <>
+        "#{inspect(changeset.action.name)}: #{message}"
+    )
   end
 
   @spec declared?(Counter.t(), atom(), term()) :: boolean()

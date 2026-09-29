@@ -8,6 +8,15 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Fixed
+
+- `AshMetrics.Changes.IncrementOnChange`,
+  `AshMetrics.Changes.IncrementOnWrite` and
+  `AshMetrics.Changes.ObserveElapsed` log any exception, throw or exit
+  while emitting, such as one from a failing `AshMetrics.TagExtractor`, and
+  leave the action's result alone. Only an `ArgumentError` was logged
+  before; anything else failed the action.
+
 ## [0.4.0] - 2026-09-19
 
 ### Added

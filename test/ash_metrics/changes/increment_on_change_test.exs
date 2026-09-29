@@ -1,3 +1,42 @@
+defmodule AshMetrics.Changes.IncrementOnChangeTest.Failing do
+  @moduledoc false
+  # A tag extractor that raises on every emission.
+
+  @behaviour AshMetrics.TagExtractor
+
+  @impl AshMetrics.TagExtractor
+  def tag_keys, do: [:tenant]
+
+  @impl AshMetrics.TagExtractor
+  def extract(_metadata), do: raise("extractor exploded")
+end
+
+defmodule AshMetrics.Changes.IncrementOnChangeTest.Throwing do
+  @moduledoc false
+  # A tag extractor that throws on every emission.
+
+  @behaviour AshMetrics.TagExtractor
+
+  @impl AshMetrics.TagExtractor
+  def tag_keys, do: [:tenant]
+
+  @impl AshMetrics.TagExtractor
+  def extract(_metadata), do: throw(:extractor_thrown)
+end
+
+defmodule AshMetrics.Changes.IncrementOnChangeTest.Exiting do
+  @moduledoc false
+  # A tag extractor that exits on every emission.
+
+  @behaviour AshMetrics.TagExtractor
+
+  @impl AshMetrics.TagExtractor
+  def tag_keys, do: [:tenant]
+
+  @impl AshMetrics.TagExtractor
+  def extract(_metadata), do: exit(:extractor_exited)
+end
+
 defmodule AshMetrics.Changes.IncrementOnChangeTest do
   # Seeds an ETS table the whole node shares, so it cannot run alongside other
   # tests.
@@ -83,6 +122,52 @@ defmodule AshMetrics.Changes.IncrementOnChangeTest do
     assert log =~ ":priority is a required tag"
 
     refute_metric_emitted(@metric)
+  end
+
+  test "any exception raised while emitting is logged and leaves the action's result alone" do
+    log = failed_open_log(__MODULE__.Failing)
+
+    assert log =~ "AshMetrics did not emit :transitions on AshMetrics.Test.Ticket"
+    assert log =~ "from action :open"
+    assert log =~ "extractor exploded"
+
+    refute_metric_emitted(@metric)
+  end
+
+  test "a throw while emitting is logged and leaves the action's result alone" do
+    log = failed_open_log(__MODULE__.Throwing)
+
+    assert log =~ "AshMetrics did not emit :transitions on AshMetrics.Test.Ticket"
+    assert log =~ "** (throw) :extractor_thrown"
+
+    refute_metric_emitted(@metric)
+  end
+
+  test "an exit while emitting is logged and leaves the action's result alone" do
+    log = failed_open_log(__MODULE__.Exiting)
+
+    assert log =~ "AshMetrics did not emit :transitions on AshMetrics.Test.Ticket"
+    assert log =~ "** (exit) :extractor_exited"
+
+    refute_metric_emitted(@metric)
+  end
+
+  # Opens a ticket with `extractor` as the tag extractor, asserts the action
+  # still succeeds, and returns what it logged.
+  defp failed_open_log(extractor) do
+    original = Application.get_env(:ash_metrics, :tag_extractor)
+    Application.put_env(:ash_metrics, :tag_extractor, extractor)
+
+    on_exit(fn ->
+      case original do
+        nil -> Application.delete_env(:ash_metrics, :tag_extractor)
+        extractor -> Application.put_env(:ash_metrics, :tag_extractor, extractor)
+      end
+    end)
+
+    capture_log(fn ->
+      assert %Ticket{status: :open} = open!(priority: :low, assignee: "ana")
+    end)
   end
 
   defp open!(attrs), do: Ash.create!(Ticket, Map.new(attrs), action: :open)

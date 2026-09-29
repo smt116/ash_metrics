@@ -20,8 +20,9 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   Nothing is emitted when the counter declares the attribute as a closed tag
   and the new value is not one of the declared values.
 
-  An emission `AshMetrics.increment/3` rejects is logged at error level with
-  the resource, the action and the counter; the action still succeeds.
+  An emission that raises, throws or exits, whether `AshMetrics.increment/3`
+  rejects it or the tag extractor fails, is logged at error level with the
+  resource, the action and the counter; the action's result is never altered.
 
   ## Atomics
 

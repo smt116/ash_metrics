@@ -12,7 +12,7 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   alters the action's result.
 
   The tags the emission carries, the closed-tag value it skips and the logging
-  of an emission `AshMetrics.increment/3` rejects are those of
+  of an emission that fails are those of
   `AshMetrics.Changes.IncrementOnChange`.
 
   ## Atomics

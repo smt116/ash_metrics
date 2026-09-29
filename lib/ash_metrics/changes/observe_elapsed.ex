@@ -26,8 +26,10 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   `AshMetrics.TagExtractor` derives from the changeset's context, its tenant,
   the resource and the action name.
 
-  An observation `AshMetrics.observe/4` rejects is logged at error level with
-  the resource, the action and the distribution; the action still succeeds.
+  An observation that raises, throws or exits, whether `AshMetrics.observe/4`
+  rejects it or the tag extractor fails, is logged at error level with the
+  resource, the action and the distribution; the action's result is never
+  altered.
 
   ## Atomics
 
