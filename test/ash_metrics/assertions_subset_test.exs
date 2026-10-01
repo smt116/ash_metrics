@@ -1,6 +1,5 @@
 defmodule AshMetrics.AssertionsSubsetTest do
-  # Attaches handlers for globally visible `:telemetry` events.
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   use AshMetrics.Test, resources: [AshMetrics.Test.Invoice]
 
   alias AshMetrics.Test.Delivery

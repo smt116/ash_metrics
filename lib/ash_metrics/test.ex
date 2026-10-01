@@ -4,11 +4,11 @@ defmodule AshMetrics.Test do
 
   `use AshMetrics.Test` after `use ExUnit.Case`. It attaches a handler for
   every metric of the application for the duration of each test, detaches it
-  afterwards, and imports `assert_metric_emitted/2` and
-  `refute_metric_emitted/2`.
+  afterwards, and imports `assert_metric_emitted/2`, `refute_metric_emitted/2`
+  and `allow/1`.
 
       defmodule MyApp.MailingsTest do
-        use ExUnit.Case, async: false
+        use ExUnit.Case, async: true
         use AshMetrics.Test
 
         test "a delivery emits a sent counter" do
@@ -19,20 +19,26 @@ defmodule AshMetrics.Test do
         end
       end
 
-  Pass `resources:` to attach to a subset, which is worth doing in a large
-  application where most tests care about a handful of resources:
+  ## Options
 
-      use AshMetrics.Test, resources: [MyApp.Mailings.TemplatedDelivery]
+  * `:resources` — attach only to the metrics of these resources:
+
+        use AshMetrics.Test, resources: [MyApp.Mailings.TemplatedDelivery]
+
+  * `:shared` — receive every emission, from any process. A module using
+    `shared: true` must be `async: false`.
 
   ## Concurrency
 
-  `:telemetry` handlers are global: a handler attached for one process is
-  invoked for an emission from any process. Each attachment forwards only to
-  the process that asked for it, so two test processes never read each other's
-  mailbox, but a test that asserts on a metric another test is emitting
-  concurrently will see both. Keep modules that use these assertions
-  `async: false`, or scope them with `resources:` to metrics no async test
-  emits.
+  A test receives an emission only when the emitting process is owned by the
+  test process: when that process, or any process in its `$callers`, is the
+  test process or a process passed to `allow/1`. `Task`s and other processes
+  that propagate `$callers`, such as `Phoenix.LiveViewTest` LiveViews, are
+  owned by the process that started them. Modules using these assertions can
+  therefore be `async: true`.
+
+  An emission from a process the test does not own is dropped silently. Pass
+  that process to `allow/1`, or use `shared: true`.
   """
 
   @assert_timeout 100
@@ -44,15 +50,20 @@ defmodule AshMetrics.Test do
   @doc false
   @spec __using__(keyword()) :: Macro.t()
   defmacro __using__(opts) do
+    opts = Keyword.validate!(opts, [:resources, shared: false])
+
     metrics =
       case Keyword.fetch(opts, :resources) do
         {:ok, resources} -> quote(do: AshMetrics.metrics_for(unquote(resources)))
         :error -> quote(do: AshMetrics.metrics())
       end
 
+    shared = Keyword.fetch!(opts, :shared)
+
     quote do
       import AshMetrics.Test,
         only: [
+          allow: 1,
           assert_metric_emitted: 1,
           assert_metric_emitted: 2,
           refute_metric_emitted: 1,
@@ -62,13 +73,24 @@ defmodule AshMetrics.Test do
       setup do
         test_process = self()
 
-        AshMetrics.Backend.Test.attach(unquote(metrics), test_process)
+        :ok =
+          AshMetrics.Backend.Test.attach(unquote(metrics), test_process, shared: unquote(shared))
+
         on_exit(fn -> AshMetrics.Backend.Test.detach(test_process) end)
 
         :ok
       end
     end
   end
+
+  @doc """
+  Makes the emissions of `pid` count as the calling test's; see
+  `AshMetrics.Backend.Test.allow/2`.
+
+  Call it from the test process, before `pid` emits.
+  """
+  @spec allow(pid()) :: :ok
+  def allow(pid), do: AshMetrics.Backend.Test.allow(self(), pid)
 
   @doc """
   Asserts that a metric named `name` was emitted, and returns its measurements

@@ -11,7 +11,7 @@ duration of each test and imports the assertions.
 
 ```elixir
 defmodule MyApp.MailingsTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   use AshMetrics.Test
 
   test "a delivery emits a sent counter" do
@@ -26,8 +26,18 @@ defmodule MyApp.MailingsTest do
 end
 ```
 
-`:telemetry` handlers are global, so keep such modules `async: false`, or
-narrow the attachment with `resources:` to metrics no async test emits:
+A test receives an emission only when the emitting process, or a process in
+its `$callers`, is the test process or one passed to `allow/1`. Emissions from
+the test process and from the `Task`s it starts arrive, so these modules can
+be `async: true`. An emission from any other process, such as a GenServer, a
+supervised worker or an Oban job not run inline, is dropped silently. Fix it in
+one of two ways:
+
+- Call `allow/1` with that process's pid from the test, before it emits.
+- `use AshMetrics.Test, shared: true` to receive every emission from every
+  process. Such a module must be `async: false`.
+
+Pass `resources:` to attach only to some resources' metrics:
 
 ```elixir
 use AshMetrics.Test, resources: [MyApp.Mailings.TemplatedDelivery]
@@ -53,9 +63,11 @@ Keep `poll: false` in `config/test.exs`, which is what the installer writes;
 otherwise every gauge is polled against the test database from the moment the
 supervisor starts.
 
-To exercise a gauge, either pass `poll: true` to `AshMetrics.Supervisor` in
-that one test, or skip the poller entirely and call
-`AshMetrics.Gauge.Runner.emit/3` directly.
+To exercise a gauge, call `AshMetrics.Gauge.Runner.emit/3` from the test
+process. Passing `poll: true` to `AshMetrics.Supervisor` instead polls from
+the poller's own process, which the test does not own, so its emissions arrive
+only after `allow/1` with the poller's pid, or with `shared: true`.
 
 A test that exercises `AshMetrics.Poller.AshOban` needs a real database:
-Oban's cron inserts jobs into it.
+Oban's cron inserts jobs into it. Run the jobs with `Oban.drain_queue/2` from
+the test process, or use `shared: true`.

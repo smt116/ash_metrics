@@ -8,6 +8,25 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `AshMetrics.Test.allow/1` and `AshMetrics.Backend.Test.allow/2`, which make
+  the emissions of another process, and of the processes whose `$callers`
+  include it, count as the test's.
+- A `shared:` option on `use AshMetrics.Test` and
+  `AshMetrics.Backend.Test.attach/3` that forwards every emission from any
+  process, as every attachment did before. A module using it must be
+  `async: false`.
+
+### Changed
+
+- **Breaking.** `use AshMetrics.Test` and `AshMetrics.Backend.Test.attach/3`
+  forward only the emissions of processes the test owns: the test process,
+  the processes allowed for it, and those whose `$callers` include either.
+  Test modules using the assertions can be `async: true`. An emission from
+  any other process, such as a supervised poller, is dropped; pass the
+  process to `AshMetrics.Test.allow/1` or use `shared: true`.
+
 ## [0.4.1] - 2026-09-29
 
 ### Fixed

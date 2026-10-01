@@ -1,5 +1,5 @@
 defmodule AshMetrics.AssertionsTest do
-  # Attaches handlers for globally visible `:telemetry` events.
+  # Seeds a shared ETS table, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
   use AshMetrics.Test
 
@@ -25,6 +25,118 @@ defmodule AshMetrics.AssertionsTest do
 
     test "detaching when nothing is attached is not an error" do
       assert Backend.Test.detach(spawn(fn -> :ok end)) == :ok
+    end
+
+    test "forwards every emission when shared" do
+      Backend.Test.detach()
+      :ok = Backend.Test.attach(AshMetrics.metrics_for([Invoice]), self(), shared: true)
+
+      emit_elsewhere(fn -> AshMetrics.increment(Invoice, :capture) end)
+
+      assert_metric_emitted(@capture)
+    end
+
+    test "rejects an unknown option" do
+      Backend.Test.detach()
+
+      assert_raise ArgumentError, fn ->
+        Backend.Test.attach(AshMetrics.metrics_for([Invoice]), self(), share: true)
+      end
+    end
+
+    test "forwards to each of two concurrent owners only its own emissions" do
+      test_process = self()
+
+      owners =
+        for status <- [:sent, :bounced] do
+          Task.async(fn ->
+            :ok = Backend.Test.attach(AshMetrics.metrics_for([Delivery]))
+            send(test_process, {:attached, self()})
+
+            receive do
+              :go -> AshMetrics.increment(Delivery, :delivery, tags: %{status: status})
+            end
+
+            received = drain()
+            Backend.Test.detach()
+
+            received
+          end)
+        end
+
+      for %Task{pid: pid} <- owners, do: assert_receive({:attached, ^pid})
+      for %Task{pid: pid} <- owners, do: send(pid, :go)
+
+      assert [[sent], [bounced]] = Task.await_many(owners)
+      assert {:ash_metrics, @delivery, %{count: 1}, %{status: :sent}} = sent
+      assert {:ash_metrics, @delivery, %{count: 1}, %{status: :bounced}} = bounced
+    end
+
+    test "leaves no handler behind when detached after an allowance" do
+      allow(spawn(fn -> :ok end))
+      Backend.Test.detach()
+
+      test_process = self()
+
+      refute Enum.any?(
+               :telemetry.list_handlers([]),
+               &match?(%{config: %{pid: ^test_process}}, &1)
+             )
+    end
+
+    test "refuses an allowance for an owner that has nothing attached" do
+      owner = spawn(fn -> :ok end)
+
+      error = assert_raise ArgumentError, fn -> Backend.Test.allow(owner, self()) end
+
+      assert error.message =~ "nothing is attached for #{inspect(owner)}"
+    end
+  end
+
+  describe "ownership" do
+    test "an emission from the test process is received" do
+      AshMetrics.increment(Invoice, :capture)
+
+      assert_metric_emitted(@capture)
+    end
+
+    test "an emission from a Task the test started is received" do
+      fn -> AshMetrics.increment(Invoice, :capture) end |> Task.async() |> Task.await()
+
+      assert_metric_emitted(@capture)
+    end
+
+    test "an emission from an unrelated process is dropped" do
+      emit_elsewhere(fn -> AshMetrics.increment(Invoice, :capture) end)
+
+      refute_metric_emitted(@capture)
+    end
+
+    test "an emission from an allowed process is received" do
+      pid = await_go(fn -> AshMetrics.increment(Invoice, :capture) end)
+
+      allow(pid)
+      send(pid, :go)
+
+      assert_metric_emitted(@capture)
+    end
+
+    test "an emission from a Task an allowed process started is received" do
+      pid =
+        await_go(fn ->
+          fn -> AshMetrics.increment(Invoice, :capture) end |> Task.async() |> Task.await()
+        end)
+
+      allow(pid)
+      send(pid, :go)
+
+      assert_metric_emitted(@capture)
+    end
+
+    test "an allowance is refused once the test has detached" do
+      Backend.Test.detach()
+
+      assert_raise ArgumentError, fn -> allow(spawn(fn -> :ok end)) end
     end
   end
 
@@ -199,6 +311,34 @@ defmodule AshMetrics.AssertionsTest do
 
       assert error.message =~ "Measurements: %{count: 1}"
       assert error.message =~ ~s(Tags: %{status: :sent, provider: "ses"})
+    end
+  end
+
+  # Runs `fun` in a process outside the test's `$callers`, and waits for it.
+  @spec emit_elsewhere((-> term())) :: :ok
+  defp emit_elsewhere(fun) do
+    {pid, ref} = spawn_monitor(fun)
+    assert_receive {:DOWN, ^ref, :process, ^pid, :normal}
+
+    :ok
+  end
+
+  # Spawns a process outside the test's `$callers` that runs `fun` on `:go`.
+  @spec await_go((-> term())) :: pid()
+  defp await_go(fun) do
+    spawn(fn ->
+      receive do
+        :go -> fun.()
+      end
+    end)
+  end
+
+  @spec drain() :: [tuple()]
+  defp drain do
+    receive do
+      {:ash_metrics, _name, _measurements, _tags} = message -> [message | drain()]
+    after
+      50 -> []
     end
   end
 end

@@ -42,8 +42,8 @@ defmodule AshMetrics.UsageRulesTest do
   # * `metadata` is an option of `AshMetrics.increment/3` and
   #   `AshMetrics.observe/4`.
   # * `value` is an option of `AshMetrics.Test.assert_metric_emitted/2`.
-  # * `resources` is an option of `use AshMetrics.Test`.
-  @allowed_options [:metadata, :resources, :value, :where]
+  # * `resources` and `shared` are options of `use AshMetrics.Test`.
+  @allowed_options [:metadata, :resources, :shared, :value, :where]
 
   @fence ~r/^```.*?^```/ms
   @span ~r/`([^`\n]+)`/

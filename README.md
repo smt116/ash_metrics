@@ -395,7 +395,7 @@ another node both export it for up to one period. See
 
 ```elixir
 defmodule MyApp.MailingsTest do
-  use ExUnit.Case, async: false
+  use ExUnit.Case, async: true
   use AshMetrics.Test
 
   test "a delivery emits a sent counter" do
@@ -412,12 +412,17 @@ end
 
 `use AshMetrics.Test` attaches a handler for the duration of each test and
 imports the assertions. Name the metric as the declaration produces it, without
-the aggregation suffix a reporter adds. `:telemetry` handlers are global, so
-keep such modules `async: false` — see `AshMetrics.Test` for the details.
+the aggregation suffix a reporter adds. A test receives only the emissions of
+processes it owns, its own and those of the `Task`s it starts, so such modules
+can be `async: true`; see `AshMetrics.Test` for the ownership rule, `allow/1`
+and `shared: true`.
 
 The installer writes `config :ash_metrics, poll: false` to `config/test.exs`,
 which keeps gauges from being polled while tests run. To poll them in a test,
-set it to `true` there or pass `poll: true` to `AshMetrics.Supervisor`.
+set it to `true` there or pass `poll: true` to `AshMetrics.Supervisor`; the
+poller emits from its own process, so assert on it after `allow/1` with the
+poller's pid or with `shared: true`, or call `AshMetrics.Gauge.Runner.emit/3`
+from the test process instead.
 
 ## Development
 

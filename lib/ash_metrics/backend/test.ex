@@ -2,7 +2,7 @@ defmodule AshMetrics.Backend.Test do
   @moduledoc """
   A backend that forwards emissions to a test process's mailbox.
 
-  It starts nothing; what it adds is `attach/2`, which subscribes a process to
+  It starts nothing; what it adds is `attach/3`, which subscribes a process to
   the `:telemetry` events behind a list of metric definitions and forwards each
   one as a message:
 
@@ -11,10 +11,9 @@ defmodule AshMetrics.Backend.Test do
   `name` is the metric name without its aggregation suffix: the name a
   declaration produces, not the suffixed variant a reporter publishes.
 
-  Handlers are keyed by the receiving process, so each test attaches and
-  detaches its own. `:telemetry` handlers are still global: an attachment is
-  invoked for an emission from any process. See `AshMetrics.Test` on keeping
-  such modules `async: false`.
+  An attachment forwards only the emissions of processes the attached process
+  owns, or every emission when attached with `shared: true`;
+  `AshMetrics.Test` documents the ownership rule.
 
   `AshMetrics.Test` wires all of this up, and is what a test suite should use;
   reach for this module directly only when the assertion helpers are not what
@@ -28,21 +27,56 @@ defmodule AshMetrics.Backend.Test do
   def child_spec(_opts), do: :ignore
 
   @doc """
-  Forwards every emission behind `metrics` to `pid`, which defaults to the
+  Forwards the emissions behind `metrics` to `pid`, which defaults to the
   calling process.
+
+  ## Options
+
+  * `:shared` — forward every emission, from any process. Defaults to
+    `false`.
 
   Attaching twice for the same process fails; call `detach/1` between.
   """
-  @spec attach([Telemetry.Metrics.t()], pid()) :: :ok
-  def attach(metrics, pid \\ self()) do
+  @spec attach([Telemetry.Metrics.t()], pid(), keyword()) :: :ok | {:error, :already_exists}
+  def attach(metrics, pid \\ self(), opts \\ []) when is_pid(pid) do
+    opts = Keyword.validate!(opts, shared: false)
     names = Map.new(metrics, &{&1.event_name, base_name(&1)})
 
-    :telemetry.attach_many(
-      handler_id(pid),
-      Map.keys(names),
-      &__MODULE__.handle_event/4,
-      %{pid: pid, names: names}
-    )
+    attach_handler(pid, Map.keys(names), %{
+      pid: pid,
+      names: names,
+      shared: Keyword.fetch!(opts, :shared),
+      allowed: []
+    })
+  end
+
+  @doc """
+  Forwards to `owner` the emissions of `pid` and of the processes whose
+  `$callers` include it.
+
+  Raises `ArgumentError` when nothing is attached for `owner`. Re-attaches
+  `owner`'s handler, so an emission made by another process while this runs
+  may be missed. Concurrent calls for the same `owner` are not supported.
+  """
+  @spec allow(pid(), pid()) :: :ok
+  def allow(owner, pid) when is_pid(owner) and is_pid(pid) do
+    id = handler_id(owner)
+
+    case Enum.filter(:telemetry.list_handlers([]), &(&1.id == id)) do
+      [] ->
+        raise ArgumentError,
+              "cannot allow #{inspect(pid)}: nothing is attached for #{inspect(owner)}"
+
+      [%{config: config} | _rest] = handlers ->
+        _ = :telemetry.detach(id)
+
+        :ok =
+          attach_handler(
+            owner,
+            Enum.map(handlers, & &1.event_name),
+            %{config | allowed: Enum.uniq([pid | config.allowed])}
+          )
+    end
   end
 
   @doc """
@@ -67,10 +101,27 @@ defmodule AshMetrics.Backend.Test do
 
   @doc false
   @spec handle_event([atom()], map(), map(), map()) :: :ok
-  def handle_event(event_name, measurements, metadata, %{pid: pid, names: names}) do
-    send(pid, {:ash_metrics, Map.fetch!(names, event_name), measurements, metadata})
+  def handle_event(event_name, measurements, metadata, %{pid: pid, names: names} = config) do
+    if forward?(config) do
+      send(pid, {:ash_metrics, Map.fetch!(names, event_name), measurements, metadata})
+    end
 
     :ok
+  end
+
+  # The handler runs in the emitting process.
+  @spec forward?(map()) :: boolean()
+  defp forward?(%{shared: true}), do: true
+
+  defp forward?(%{pid: owner, allowed: allowed}) do
+    owners = [owner | allowed]
+
+    Enum.any?([self() | Process.get(:"$callers", [])], &(&1 in owners))
+  end
+
+  @spec attach_handler(pid(), [[atom()]], map()) :: :ok | {:error, :already_exists}
+  defp attach_handler(pid, event_names, config) do
+    :telemetry.attach_many(handler_id(pid), event_names, &__MODULE__.handle_event/4, config)
   end
 
   @spec handler_id(pid()) :: term()
