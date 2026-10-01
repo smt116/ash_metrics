@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-01
+
 ### Added
 
 - `AshMetrics.Test.allow/1` and `AshMetrics.Backend.Test.allow/2`, which make
@@ -185,7 +187,8 @@ and this project adheres to
   `mix igniter.install ash_metrics`, which writes the configuration and wires
   the metrics into the host application's reporter and supervision tree.
 
-[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/smt116/ash_metrics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/smt116/ash_metrics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/smt116/ash_metrics/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/smt116/ash_metrics/compare/v0.2.0...v0.3.0
