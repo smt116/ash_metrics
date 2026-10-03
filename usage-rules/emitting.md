@@ -83,17 +83,26 @@ needs `require_atomic? false` and `strategy: :stream`, even with
 are atomic on their own. A condition over the action name or an argument
 leaves the action atomic.
 
-The changes and the hand-written API disagree about a bad closed-tag value.
-A change reads the value off the written record and **skips the emission
-silently** when the counter does not declare it; `AshMetrics.increment/3` and
-`AshMetrics.observe/4` raise `ArgumentError` instead. Enumerate every value
-the attribute can hold, or the counter quietly undercounts.
-
 The changes read every other tag off the record: an attribute of the same
 name, or the `path:` the tag declares. A closed tag on such a counter must be
 one or the other, or no emission from a change could ever carry it, and a
 verifier rejects the resource. A tag whose value on the record is `nil`, a
 map or a struct is left off the emission.
+
+When the attribute `AshMetrics.increment_on_change/2` or
+`AshMetrics.increment_on_write/2` counts holds a value its closed tag does not
+declare, the change **skips the emission silently**: nothing is counted and
+nothing is logged. Enumerate every value the attribute can hold, or the
+counter quietly undercounts.
+
+Every other rejected emission from a change is logged, not raised. A closed
+tag read off the record holding an undeclared value, or left off because it
+is `nil`, makes `AshMetrics.increment/3` or `AshMetrics.observe/4` raise
+`ArgumentError` inside the change; so does anything else that raises, throws
+or exits while a change emits, such as a failing custom tag extractor. The
+change logs it at error level as `AshMetrics did not emit ...` with the
+resource, the action and the metric, emits nothing, and leaves the action's
+result alone. Called by hand, the same two functions raise to the caller.
 
 An open tag filled this way carries whatever the row holds, one timeseries
 per distinct value. Name a bounded attribute, or close it with `values:`;

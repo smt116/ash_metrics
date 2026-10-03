@@ -226,8 +226,9 @@ end
 Three caveats. An open tag that names an attribute, or declares a `path:`, is
 read off the written record and carries whatever the row holds, one timeseries
 per distinct value; name a bounded attribute or close the tag with `values:`.
-A value outside a closed tag's declared set is skipped, so a status the
-counter does not enumerate is not counted and nothing is raised. And
+A value outside a closed tag's declared set is not counted and never fails the
+action: a status the counter does not enumerate is skipped silently, and any
+other rejected emission is logged at error level. And
 `increment_on_change/2` refuses to run atomically: the action needs
 `require_atomic? false`, and `Ash.bulk_update/4` needs `:stream` among its
 strategies, or it emits nothing and returns
