@@ -4,6 +4,22 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest.ScanSummary do
   use Ash.Resource.Aggregate.CustomAggregate
 end
 
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.Choice do
+  @moduledoc false
+  # A union behind an `Ash.Type.NewType`.
+  use Ash.Type.NewType,
+    subtype_of: :union,
+    constraints: [types: [name: [type: :string], size: [type: :integer]]]
+end
+
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.Pair do
+  @moduledoc false
+  # A tuple behind an `Ash.Type.NewType`.
+  use Ash.Type.NewType,
+    subtype_of: :tuple,
+    constraints: [fields: [a: [type: :string], b: [type: :integer]]]
+end
+
 defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   # Captures the compiler's stderr, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
@@ -215,6 +231,113 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     refute message =~ "path: [:payload"
   end
 
+  test "a tag naming a list attribute without a path is refused" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [:labels])),
+               [quote(do: attribute(:labels, {:array, :string}))]
+             )
+
+    assert Exception.message(error) =~
+             "counter :delivery declares the tag :labels, whose attribute has the " <>
+               "type {:array, Ash.Type.String}, a list. A tag carries one value."
+  end
+
+  test "a path ending at a list attribute is refused" do
+    assert [%DslError{} = error] =
+             errors(
+               quote(do: counter(:delivery, tags: [l: [path: [:labels]]])),
+               [quote(do: attribute(:labels, {:array, :string}))]
+             )
+
+    assert Exception.message(error) =~ "goes through :labels, whose type"
+  end
+
+  test "a tag naming a union attribute without a path is refused" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [:choice])), [union()])
+
+    message = Exception.message(error)
+
+    assert message =~
+             "counter :delivery declares the tag :choice, whose attribute has the " <>
+               "type Ash.Type.Union"
+
+    assert message =~ "no path reaches inside that type"
+  end
+
+  test "a tag naming a tuple attribute without a path is refused" do
+    assert [%DslError{} = error] =
+             errors(quote(do: counter(:delivery, tags: [:pair])), [tuple()])
+
+    message = Exception.message(error)
+
+    assert message =~
+             "counter :delivery declares the tag :pair, whose attribute has the " <>
+               "type Ash.Type.Tuple"
+
+    assert message =~ "no path reaches inside that type"
+  end
+
+  test "a path ending at a union or a tuple attribute is refused" do
+    assert [%DslError{} = union_error] =
+             errors(quote(do: counter(:delivery, tags: [c: [path: [:choice]]])), [union()])
+
+    assert Exception.message(union_error) =~
+             "ends at :choice, whose type Ash.Type.Union wraps its value. A tag " <>
+               "carries one value, and no path reaches inside that type."
+
+    assert [%DslError{} = tuple_error] =
+             errors(quote(do: counter(:delivery, tags: [p: [path: [:pair]]])), [tuple()])
+
+    assert Exception.message(tuple_error) =~
+             "ends at :pair, whose type Ash.Type.Tuple wraps its value."
+  end
+
+  test "a path going through a union or a tuple attribute is refused" do
+    assert [%DslError{} = union_error] =
+             errors(
+               quote(do: counter(:delivery, tags: [c: [path: [:choice, :name]]])),
+               [union()]
+             )
+
+    assert Exception.message(union_error) =~
+             "goes through :choice, whose type Ash.Type.Union is not an embedded resource"
+
+    assert [%DslError{} = tuple_error] =
+             errors(quote(do: counter(:delivery, tags: [p: [path: [:pair, :a]]])), [tuple()])
+
+    assert Exception.message(tuple_error) =~
+             "goes through :pair, whose type Ash.Type.Tuple is not an embedded resource"
+  end
+
+  test "a NewType wrapping a union or a tuple is refused as the bare type is" do
+    new_types = [
+      quote(do: attribute(:choice, AshMetrics.Verifiers.VerifyMetricsTest.Choice)),
+      quote(do: attribute(:pair, AshMetrics.Verifiers.VerifyMetricsTest.Pair))
+    ]
+
+    for tag <- [:choice, :pair] do
+      assert [%DslError{} = error] =
+               errors(quote(do: counter(:delivery, tags: [unquote(tag)])), new_types)
+
+      assert Exception.message(error) =~ "declares the tag #{inspect(tag)}"
+      assert Exception.message(error) =~ "no path reaches inside that type"
+    end
+
+    assert [%DslError{} = union_error] =
+             errors(quote(do: counter(:delivery, tags: [c: [path: [:choice]]])), new_types)
+
+    assert Exception.message(union_error) =~
+             "ends at :choice, whose type Ash.Type.Union wraps its value."
+
+    assert [%DslError{} = tuple_error] =
+             errors(quote(do: counter(:delivery, tags: [p: [path: [:pair]]])), new_types)
+
+    assert Exception.message(tuple_error) =~
+             "ends at :pair, whose type Ash.Type.Tuple wraps its value."
+  end
+
   describe "a tag read from a calculation" do
     test "is accepted without a path, and with a path into an embedded result" do
       assert calculation_errors(
@@ -268,6 +391,19 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
 
       assert message =~ "no path reaches inside that type"
       assert message =~ "read it from a calculation that returns the single value"
+    end
+
+    test "is refused without a path when the calculation returns a union" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [:choice])))
+
+      message = Exception.message(error)
+
+      assert message =~
+               "counter :delivery declares the tag :choice, whose calculation has " <>
+                 "the type Ash.Type.Union"
+
+      assert message =~ "no path reaches inside that type"
     end
 
     test "is refused without a path when the calculation returns an embedded resource" do
@@ -555,6 +691,19 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   # The embedded attribute the tag paths under test descend into.
   defp location, do: quote(do: attribute(:location, AshMetrics.Test.Location))
 
+  defp union do
+    quote do
+      attribute :choice, :union,
+        constraints: [types: [name: [type: :string], size: [type: :integer]]]
+    end
+  end
+
+  defp tuple do
+    quote do
+      attribute :pair, :tuple, constraints: [fields: [a: [type: :string], b: [type: :integer]]]
+    end
+  end
+
   # A throwaway resource declaring calculations of every shape a tag may or may
   # not read from.
   defp calculation_errors(declarations) do
@@ -589,6 +738,11 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
             calculate :route, AshMetrics.Test.Location, fn records, _context ->
               Enum.map(records, fn _record -> nil end)
             end
+
+            calculate :choice,
+                      :union,
+                      fn records, _context -> Enum.map(records, fn _record -> nil end) end,
+                      constraints: [types: [name: [type: :string], size: [type: :integer]]]
           end
         end
       ]

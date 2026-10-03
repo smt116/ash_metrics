@@ -40,6 +40,12 @@ and this project adheres to
   action that is not `soft? true` whose metric reads a tag from a calculation
   or an aggregate. A declaration that compiled cleanly may now emit a
   compiler warning.
+- `AshMetrics.Verifiers.VerifyMetrics` rejects a tag without a path that
+  names an attribute whose type is a list, as it already rejected one naming
+  a map or an embedded resource. It also rejects a tag without a path naming,
+  and a `path:` ending at, an attribute, a calculation or an aggregate whose
+  type is `Ash.Type.Union` or `Ash.Type.Tuple`. A declaration that compiled
+  cleanly may now emit a compiler warning.
 
 ## [0.5.0] - 2026-10-01
 

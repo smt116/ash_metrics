@@ -12,11 +12,12 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * a closed tag declares at least one value, and no value twice
   * a tag's `path` starts at an attribute, a calculation or an aggregate of
     the resource, descends through embedded resources, never through a list,
-    and ends at a field that is neither an embedded resource nor a map
-  * a tag with no `path` does not name an attribute whose type is an embedded
-    resource, a map, a struct or a keyword list, nor a calculation or an
-    aggregate whose type is one of those or a list, which the action changes
-    could never read a value from
+    and ends at a field that is not an embedded resource, a map, a
+    struct, a keyword list, a union or a tuple
+  * a tag with no `path` does not name an attribute, a calculation or an
+    aggregate whose type is a list, an embedded resource, a map, a struct, a
+    keyword list, a union or a tuple, which the action changes could never
+    read a single value from
   * a calculation a tag or the start of a path names takes no argument that
     is `allow_nil? false` and has no default
   * an aggregate a tag or the start of a path names is not a `list`
@@ -47,6 +48,10 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   # The types that hold several values under keys of their own, which a tag
   # can only carry one of, through a path.
   @map_types [Ash.Type.Map, Ash.Type.Struct, Ash.Type.Keyword]
+
+  # The types whose value wraps what it holds in an `%Ash.Union{}` or a tuple,
+  # which a tag cannot carry and no path reaches inside.
+  @wrapping_types [Ash.Type.Union, Ash.Type.Tuple]
 
   @impl Spark.Dsl.Verifier
   @spec verify(map()) :: :ok | {:error, Exception.t()}
@@ -395,6 +400,15 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
             "#{inspect(type)} holds several values. A tag carries one value."
         )
 
+      type in @wrapping_types ->
+        error(
+          dsl_state,
+          metric,
+          "#{tagged(metric, tag)} ends at #{inspect(segment)}, whose type " <>
+            "#{inspect(type)} wraps its value. A tag carries one value, and no " <>
+            "path reaches inside that type."
+        )
+
       true ->
         :ok
     end
@@ -439,13 +453,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
 
   defp verify_pathless(_dsl_state, _metric, _tag, nil), do: :ok
 
-  defp verify_pathless(dsl_state, metric, tag, {:attribute, %{type: type}}) do
-    if map_type?(unwrap(type)) do
-      several_values(dsl_state, metric, tag, :attribute, type)
-    else
-      :ok
-    end
-  end
+  defp verify_pathless(dsl_state, metric, tag, {:attribute, %{type: type}}),
+    do: verify_single_value(dsl_state, metric, tag, :attribute, type)
 
   defp verify_pathless(dsl_state, metric, tag, {kind, derived}) do
     verify_derived(dsl_state, metric, tag, kind, derived, fn type ->
@@ -465,7 +474,7 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
         )
 
       unwrapped ->
-        if map_type?(unwrapped) do
+        if several_values?(unwrapped) do
           several_values(dsl_state, metric, tag, kind, type)
         else
           :ok
@@ -495,7 +504,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     end
   end
 
-  defp map_type?(type), do: type in @map_types or ResourceInfo.resource?(type)
+  defp several_values?(type),
+    do: type in @map_types or type in @wrapping_types or ResourceInfo.resource?(type)
 
   defp unwrap(type) when is_atom(type) do
     if compiled?(type) and NewType.new_type?(type) do

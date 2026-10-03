@@ -37,6 +37,16 @@ defmodule AshMetrics.Changes.IncrementOnChangeTest.Exiting do
   def extract(_metadata), do: exit(:extractor_exited)
 end
 
+defmodule AshMetrics.Changes.IncrementOnChangeTest.Unregistered do
+  @moduledoc false
+  # The domain the resources compiled by a test are run through.
+  use Ash.Domain, validate_config_inclusion?: false
+
+  resources do
+    allow_unregistered? true
+  end
+end
+
 defmodule AshMetrics.Changes.IncrementOnChangeTest do
   # Seeds an ETS table the whole node shares, so it cannot run alongside other
   # tests.
@@ -45,6 +55,7 @@ defmodule AshMetrics.Changes.IncrementOnChangeTest do
 
   import ExUnit.CaptureLog
 
+  alias AshMetrics.Test.Compiler
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.Ticket
 
@@ -160,6 +171,75 @@ defmodule AshMetrics.Changes.IncrementOnChangeTest do
     assert log =~ "** (exit) :extractor_exited"
 
     refute_metric_emitted(@metric)
+  end
+
+  test "a declaration the verifier rejects leaves a union tag off and carries a tuple whole" do
+    resource =
+      Compiler.compile_resource(
+        quote do
+          metrics do
+            counter :writes, tags: [:status, :choice, :pair]
+          end
+        end,
+        [
+          quote(do: attribute(:status, :atom, public?: true)),
+          quote do
+            attribute :choice, :union,
+              public?: true,
+              constraints: [types: [name: [type: :string], size: [type: :integer]]]
+          end,
+          quote do
+            attribute :pair, :tuple,
+              public?: true,
+              constraints: [fields: [a: [type: :string], b: [type: :integer]]]
+          end
+        ],
+        [
+          quote do
+            actions do
+              create :write do
+                accept [:status, :choice, :pair]
+
+                change AshMetrics.increment_on_change(:writes, :status)
+              end
+            end
+          end
+        ],
+        Ash.DataLayer.Ets
+      )
+
+    # The verifier reports the first tag it rejects, `:choice`; its rejection
+    # of `:pair` is pinned in `AshMetrics.Verifiers.VerifyMetricsTest`.
+    assert [error] = Compiler.dsl_errors_for(resource)
+    assert Exception.message(error) =~ "declares the tag :choice"
+    assert Exception.message(error) =~ "Ash.Type.Union"
+
+    # A resource with no domain has no metric name to assert on, so the
+    # handler listens for its event.
+    test_process = self()
+    handler = {__MODULE__, test_process}
+
+    :ok =
+      :telemetry.attach(
+        handler,
+        AshMetrics.event_name(resource, :writes),
+        fn _event, measurements, metadata, _config ->
+          send(test_process, {:emitted, measurements, metadata})
+        end,
+        nil
+      )
+
+    on_exit(fn -> :telemetry.detach(handler) end)
+
+    resource
+    |> Ash.Changeset.for_create(:write, %{status: :written, choice: "ana", pair: {"ana", 1}},
+      domain: __MODULE__.Unregistered
+    )
+    |> Ash.create!()
+
+    assert_receive {:emitted, %{count: 1}, metadata}
+    assert %{status: :written, pair: {"ana", 1}} = metadata
+    refute Map.has_key?(metadata, :choice)
   end
 
   # Opens a ticket with `extractor` as the tag extractor, asserts the action
