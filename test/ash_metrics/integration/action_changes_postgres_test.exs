@@ -10,15 +10,20 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
 
   alias Ash.BulkResult
   alias Ash.Error.Invalid.NoMatchingBulkStrategy
+  alias AshMetrics.Changes.TagLoadError
   alias AshMetrics.Test.PgTicket
+  alias AshMetrics.Test.PgTicketComment
   alias AshMetrics.Test.Repo
 
   @transitions "test.pg.pg_ticket.transitions"
   @elapsed "test.pg.pg_ticket.time_to_resolve"
+  @escalations "test.pg.pg_ticket.escalations"
+  @audits "test.pg.pg_ticket.audits"
+  @reviews "test.pg.pg_ticket.reviews"
 
   setup do
-    Repo.delete_all(PgTicket)
-    on_exit(fn -> Repo.delete_all(PgTicket) end)
+    empty!()
+    on_exit(&empty!/0)
 
     :ok
   end
@@ -202,6 +207,184 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
     end
   end
 
+  describe "a tag read from an aggregate" do
+    test "counts the related rows" do
+      ticket = open!("ana")
+      comment!(ticket)
+      comment!(ticket)
+
+      Ash.update!(ticket, %{status: :in_progress}, action: :escalate)
+
+      assert_metric_emitted(@escalations,
+        tags: %{status: :in_progress, commented: true, comment_count: 2}
+      )
+    end
+
+    test "sees the uncommitted rows of a surrounding transaction" do
+      ticket = open!("ana")
+
+      assert {:ok, _ticket} =
+               Ash.transaction([PgTicket, PgTicketComment], fn ->
+                 comment!(ticket)
+                 Ash.update!(ticket, %{status: :in_progress}, action: :escalate)
+               end)
+
+      assert_metric_emitted(@escalations, tags: %{commented: true, comment_count: 1})
+    end
+
+    test "is read for each record of a bulk update" do
+      ana = open!("ana")
+      open!("bo")
+      comment!(ana)
+
+      assert %BulkResult{status: :success} =
+               Ash.bulk_update(PgTicket, :escalate, %{status: :in_progress})
+
+      assert_metric_emitted(@escalations, tags: %{commented: true, comment_count: 1})
+      assert_metric_emitted(@escalations, tags: %{commented: false, comment_count: 0})
+      refute_metric_emitted(@escalations)
+    end
+  end
+
+  describe "a tag read from an expression calculation" do
+    test "is computed from the written row and its related rows" do
+      busy = open!("ana")
+      quiet = open!("bo")
+      comment!(busy)
+      comment!(busy)
+      comment!(quiet)
+
+      Ash.update!(busy, %{status: :in_progress}, action: :escalate)
+      assert_metric_emitted(@escalations, tags: %{discussion: :busy, comment_count: 2})
+
+      Ash.update!(quiet, %{status: :in_progress}, action: :escalate)
+      assert_metric_emitted(@escalations, tags: %{discussion: :quiet})
+    end
+  end
+
+  describe "a tag whose calculation fails to load inside a surrounding transaction" do
+    test "rolls the transaction back with the error when Postgres rejects the calculation" do
+      ticket = open!("ana")
+      drain()
+
+      assert {:error, %Ash.Error.Unknown{errors: [%TagLoadError{} = error]}} =
+               fail_in_transaction(ticket, :audit)
+
+      assert %TagLoadError{resource: PgTicket, action: :audit, metric: :audits} = error
+      assert error.fields == [:broken]
+      assert %Ash.Error.Unknown{} = error.error
+
+      message = Exception.message(error)
+      assert message =~ "division by zero"
+      refute message =~ "#Ash.Query<"
+
+      refute_received :statement_after_the_action
+      assert [%PgTicket{status: :open}] = Ash.read!(PgTicket)
+      refute_metric_emitted(@audits)
+    end
+
+    test "rolls the transaction back with the error when the calculation raises" do
+      ticket = open!("ana")
+      drain()
+
+      assert {:error, %Ash.Error.Unknown{errors: [%TagLoadError{} = error]}} =
+               fail_in_transaction(ticket, :review)
+
+      assert %TagLoadError{action: :review, metric: :reviews, fields: [:faulty]} = error
+      assert Exception.message(error) =~ "the calculation failed"
+
+      refute_received :statement_after_the_action
+      assert [%PgTicket{status: :open}] = Ash.read!(PgTicket)
+      refute_metric_emitted(@reviews)
+    end
+
+    test "rolls the transaction back when the changeset was built outside it" do
+      ticket = open!("ana")
+      drain()
+      changeset = Ash.Changeset.for_update(ticket, :review, %{status: :in_progress})
+      test = self()
+
+      capture_log(fn ->
+        assert {:error, %Ash.Error.Unknown{errors: [%TagLoadError{metric: :reviews}]}} =
+                 Ash.transaction(PgTicket, fn ->
+                   open!("bo")
+                   Ash.update(changeset)
+                   send(test, :statement_after_the_action)
+                   Ash.read!(PgTicket)
+                 end)
+      end)
+
+      refute_received :statement_after_the_action
+      assert [%PgTicket{status: :open}] = Ash.read!(PgTicket)
+      refute_metric_emitted(@reviews)
+    end
+
+    test "rolls the transaction back from a bulk update, whatever its strategy" do
+      Enum.each(~w(ana bo), &open!/1)
+      drain()
+
+      for strategy <- [:atomic, :stream] do
+        assert {:error, %Ash.Error.Unknown{errors: [%TagLoadError{}]}} =
+                 Ash.transaction(PgTicket, fn ->
+                   Ash.bulk_update(PgTicket, :audit, %{status: :in_progress},
+                     strategy: strategy,
+                     rollback_on_error?: false
+                   )
+                 end)
+      end
+
+      assert Enum.map(Ash.read!(PgTicket), & &1.status) == [:open, :open]
+      refute_metric_emitted(@audits)
+    end
+  end
+
+  describe "a tag whose calculation fails to load outside a transaction" do
+    test "is logged, and the write persists" do
+      ticket = open!("ana")
+
+      log =
+        capture_log(fn ->
+          assert {:ok, %PgTicket{status: :in_progress}} =
+                   Ash.update(ticket, %{status: :in_progress}, action: :audit)
+        end)
+
+      assert log =~ "AshMetrics did not emit :audits on AshMetrics.Test.PgTicket"
+      assert log =~ "division by zero"
+
+      assert Ash.get!(PgTicket, ticket.id).status == :in_progress
+      refute_metric_emitted(@audits)
+    end
+
+    test "is logged from a bulk update, and the writes persist" do
+      Enum.each(~w(ana bo), &open!/1)
+
+      log =
+        capture_log(fn ->
+          assert %BulkResult{status: :success} =
+                   Ash.bulk_update(PgTicket, :audit, %{status: :in_progress})
+        end)
+
+      assert log =~ "AshMetrics did not emit :audits"
+      assert Enum.map(Ash.read!(PgTicket), & &1.status) == [:in_progress, :in_progress]
+      refute_metric_emitted(@audits)
+    end
+
+    test "is logged from a streamed bulk update, and the writes persist" do
+      Enum.each(~w(ana bo), &open!/1)
+
+      log =
+        capture_log(fn ->
+          assert %BulkResult{status: :success} =
+                   Ash.bulk_update(PgTicket, :audit, %{status: :in_progress}, strategy: :stream)
+        end)
+
+      assert log =~ "AshMetrics did not emit :audits"
+      assert log =~ "division by zero"
+      assert Enum.map(Ash.read!(PgTicket), & &1.status) == [:in_progress, :in_progress]
+      refute_metric_emitted(@audits)
+    end
+  end
+
   describe "Ash.bulk_create/4" do
     test "emits once per record" do
       assert %BulkResult{status: :success, records: records} =
@@ -225,6 +408,28 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
         tags: %{status: :open, priority: :high, assignee: "bo"}
       )
     end
+  end
+
+  defp empty! do
+    Repo.delete_all(PgTicketComment)
+    Repo.delete_all(PgTicket)
+  end
+
+  defp comment!(ticket) do
+    Ash.create!(PgTicketComment, %{ticket_id: ticket.id})
+  end
+
+  # Opens a ticket, runs `action` on `ticket` and reads the table, all in one
+  # transaction, reporting whether the statement after the action ran.
+  defp fail_in_transaction(ticket, action) do
+    test = self()
+
+    Ash.transaction(PgTicket, fn ->
+      open!("bo")
+      Ash.update(ticket, %{status: :in_progress}, action: action)
+      send(test, :statement_after_the_action)
+      Ash.read!(PgTicket)
+    end)
   end
 
   defp open!(assignee) do

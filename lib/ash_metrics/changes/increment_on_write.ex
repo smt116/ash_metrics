@@ -8,11 +8,12 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
 
   Once the action succeeds, the change emits one count through
   `AshMetrics.increment/3` for the attribute's value on the record. An action
-  that fails emits nothing, and the change never alters the action's result.
+  that fails emits nothing.
 
   The tags the emission carries, the closed-tag value it skips, the logging of
-  an emission that fails and when it emits within a transaction, including the
-  one case in which a failing action still emits, are those of
+  an emission that fails, and when it emits within a transaction, including
+  the one case in which a failing action still emits and the one in which a
+  failed load rolls the transaction back, are those of
   `AshMetrics.Changes.IncrementOnChange`.
 
   ## Atomics
@@ -27,6 +28,7 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
 
   alias Ash.Changeset
   alias AshMetrics.Changes.Emission
+  alias AshMetrics.Changes.TagLoadError
 
   @impl Ash.Resource.Change
   @spec init(keyword()) :: {:ok, keyword()} | {:error, String.t()}
@@ -47,7 +49,8 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   @spec atomic?() :: true
   def atomic?, do: true
 
-  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) ::
+          :ok | {:error, TagLoadError.t()}
   defp increment(changeset, opts, record) do
     Emission.emit(changeset, opts[:counter], fn -> Emission.count(changeset, opts, record) end)
   end

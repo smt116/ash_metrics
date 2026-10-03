@@ -87,7 +87,8 @@ defmodule AshMetrics.MixProject do
         "Action changes": [
           AshMetrics.Changes.IncrementOnChange,
           AshMetrics.Changes.IncrementOnWrite,
-          AshMetrics.Changes.ObserveElapsed
+          AshMetrics.Changes.ObserveElapsed,
+          AshMetrics.Changes.TagLoadError
         ],
         Behaviours: [
           AshMetrics.Backend,

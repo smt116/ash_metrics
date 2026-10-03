@@ -13,5 +13,7 @@ defmodule AshMetrics.Test.Queue do
     resource AshMetrics.Test.ObanJob
     resource AshMetrics.Test.Ticket
     resource AshMetrics.Test.Order
+    resource AshMetrics.Test.Parcel
+    resource AshMetrics.Test.ParcelScan
   end
 end

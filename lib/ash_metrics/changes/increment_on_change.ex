@@ -8,22 +8,24 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   Once the action succeeds, the change compares the attribute's value on the
   record with the changeset's original data and emits one count through
   `AshMetrics.increment/3` when the two differ; a create emits once for the
-  value it wrote. An action that fails emits nothing, except as
-  "Transactions" below describes, and the change never alters the action's
-  result.
+  value it wrote. An action that fails emits nothing, and the change leaves
+  the action's result alone, except as "Transactions" below describes.
 
   The emission carries the attribute as a tag, every other declared tag of the
-  counter that is read off the record — by attribute name, or at the `path:`
-  the tag declares, as `AshMetrics.Dsl.Tags` documents — and whatever the
-  configured `AshMetrics.TagExtractor` derives from the changeset's context,
-  its tenant, the resource and the action name.
+  counter that is read from the record — by the name of an attribute,
+  calculation or aggregate, or at the `path:` the tag declares, as
+  `AshMetrics.Dsl.Tags` documents — and whatever the configured
+  `AshMetrics.TagExtractor` derives from the changeset's context, its tenant,
+  the resource and the action name.
 
   Nothing is emitted when the counter declares the attribute as a closed tag
   and the new value is not one of the declared values.
 
   An emission that raises, throws or exits, whether `AshMetrics.increment/3`
-  rejects it or the tag extractor fails, is logged at error level with the
-  resource, the action and the counter; the action's result is never altered.
+  rejects it, a calculation or aggregate a tag names fails to load or the tag
+  extractor fails, is logged at error level with the resource, the action and
+  the counter, and the action's result is left alone. A load that fails while
+  a transaction is open is the exception "Transactions" describes.
 
   ## Transactions
 
@@ -43,6 +45,17 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   `after_transaction` hook, and Ash logs its warning about transaction hooks
   running inside a transaction.
 
+  A calculation or aggregate a tag names that fails to load while a
+  transaction is open, whether the data layer rejects it or it raises, throws
+  or exits, rolls back that transaction instead of being logged, whichever
+  hook the changeset carries. The call that opened the transaction returns
+  `{:error, %Ash.Error.Unknown{}}` whose `errors` hold an
+  `AshMetrics.Changes.TagLoadError`, and nothing written within the
+  transaction persists. A bulk action run inside the
+  transaction is rolled back the same way, whatever its strategy and its
+  `rollback_on_error?`. With no transaction open, a load that fails is logged
+  as above, and the write persists.
+
   ## Atomics
 
   The change reads the attribute's original value, which an atomic update does
@@ -55,6 +68,7 @@ defmodule AshMetrics.Changes.IncrementOnChange do
 
   alias Ash.Changeset
   alias AshMetrics.Changes.Emission
+  alias AshMetrics.Changes.TagLoadError
 
   @not_atomic "AshMetrics.Changes.IncrementOnChange compares an attribute " <>
                 "with its original value, which an atomic update does not " <>
@@ -80,7 +94,8 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   @spec atomic?() :: false
   def atomic?, do: false
 
-  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  @spec increment(Changeset.t(), keyword(), Ash.Resource.record()) ::
+          :ok | {:error, TagLoadError.t()}
   defp increment(changeset, opts, record) do
     Emission.emit(changeset, opts[:counter], fn ->
       attribute = opts[:attribute]

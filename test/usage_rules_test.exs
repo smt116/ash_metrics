@@ -39,11 +39,12 @@ defmodule AshMetrics.UsageRulesTest do
   # Option names that belong to neither the DSL nor `AshMetrics.Config`:
   #
   # * `where` is Ash's own option on a `change` declaration.
+  # * `default` is Ash's own option on an aggregate.
   # * `metadata` is an option of `AshMetrics.increment/3` and
   #   `AshMetrics.observe/4`.
   # * `value` is an option of `AshMetrics.Test.assert_metric_emitted/2`.
   # * `resources` and `shared` are options of `use AshMetrics.Test`.
-  @allowed_options [:metadata, :resources, :shared, :value, :where]
+  @allowed_options [:default, :metadata, :resources, :shared, :value, :where]
 
   @fence ~r/^```.*?^```/ms
   @span ~r/`([^`\n]+)`/

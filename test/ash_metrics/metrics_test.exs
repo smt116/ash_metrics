@@ -208,11 +208,18 @@ defmodule AshMetrics.MetricsTest do
                [:test, :queue, :order, :placements, :count],
                [:test, :queue, :order, :dispatches, :count],
                [:test, :queue, :order, :fulfillment_time, :duration],
+               [:test, :queue, :parcel, :receptions, :count],
+               [:test, :queue, :parcel, :audits, :count],
+               [:test, :queue, :parcel, :rollbacks, :count],
+               [:test, :queue, :parcel, :transit_time, :duration],
                [:test, :pg, :pg_job, :backlog, :gauge],
                [:test, :pg, :pg_job, :total, :gauge],
                [:test, :pg, :pg_oban_job, :backlog, :gauge],
                [:test, :pg, :pg_ticket, :transitions, :count],
-               [:test, :pg, :pg_ticket, :time_to_resolve, :duration]
+               [:test, :pg, :pg_ticket, :time_to_resolve, :duration],
+               [:test, :pg, :pg_ticket, :escalations, :count],
+               [:test, :pg, :pg_ticket, :audits, :count],
+               [:test, :pg, :pg_ticket, :reviews, :count]
              ]
     end
 

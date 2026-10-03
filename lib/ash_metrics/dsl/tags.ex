@@ -30,14 +30,15 @@ defmodule AshMetrics.Dsl.Tags do
   `AshMetrics.observe/4` by hand passes the value itself, whatever the path
   says. A gauge's `group_by` takes no path.
 
-  ## Reading a tag off the written record
+  ## Reading a tag from the written record
 
   `AshMetrics.Changes.IncrementOnChange`,
   `AshMetrics.Changes.IncrementOnWrite` and
   `AshMetrics.Changes.ObserveElapsed` read every declared tag from the record
   their action wrote: one with a path at that path, and one without a path
-  from the attribute of the same name. A tag without a path that names no
-  attribute is left off, for the call site or the tag extractor to supply.
+  from the attribute, calculation or aggregate of the same name. A tag without
+  a path that names none of these is left off, for the call site or the tag
+  extractor to supply.
 
   The tag is left off the emission when a segment of the walk is `nil`, and
   when the value the walk arrives at is a map or a struct.
@@ -45,6 +46,33 @@ defmodule AshMetrics.Dsl.Tags do
   An open tag read this way carries whatever the row holds, one timeseries
   per distinct value. Name a bounded attribute, or close the tag with
   `values:`; a free-text or user-entered attribute is neither.
+
+  ## Calculations and aggregates
+
+  When a metric's declared tags name calculations or aggregates of the
+  resource, the change loads exactly those for the written record before
+  reading its tags, once for every record it emits for, a bulk action
+  included. A metric whose tags name none loads nothing. The record the action
+  returns does not carry the loaded values.
+
+  The load runs with `authorize?: false` and the changeset's domain and
+  tenant, so a tag can carry a value the actor is not allowed to read. It
+  passes no actor and none of the changeset's context, so a calculation
+  reading `^actor(...)` or `^context(...)` sees `nil`. A calculation is loaded
+  without arguments, so each argument takes its default.
+
+  A `sum`, `max`, `min`, `first` or `avg` aggregate over no related rows is
+  `nil` unless it declares `default:`, so its tag is left off; as a closed tag
+  that is a failed emission, logged each time. A `count` is `0` and an
+  `exists` is `false`.
+
+  The loaded value is that of the data when the change emits: inside an open
+  transaction it includes the transaction's uncommitted writes, and after the
+  commit it may include writes committed since.
+
+  A load that fails is logged, or rolls back the transaction open when it
+  fails, as `AshMetrics.Changes.IncrementOnChange`, "Transactions",
+  documents.
 
   `AshMetrics.Verifiers.VerifyMetrics` checks a path against the resource's
   attributes while it compiles.

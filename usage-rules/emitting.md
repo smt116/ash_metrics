@@ -83,11 +83,28 @@ needs `require_atomic? false` and `strategy: :stream`, even with
 are atomic on their own. A condition over the action name or an argument
 leaves the action atomic.
 
-The changes read every other tag off the record: an attribute of the same
-name, or the `path:` the tag declares. A closed tag on such a counter must be
-one or the other, or no emission from a change could ever carry it, and a
-verifier rejects the resource. A tag whose value on the record is `nil`, a
-map or a struct is left off the emission.
+The changes read every other tag from the record: the attribute, calculation
+or aggregate of the same name, or the `path:` the tag declares. A closed tag
+on such a counter must name an attribute or declare a path, or no emission
+from a change could ever carry it, and a verifier rejects the resource. A tag
+whose value on the record is `nil`, a map or a struct is left off the
+emission.
+
+A tag naming a calculation or an aggregate makes the change load it for every
+record it emits for, bulk actions included, with `authorize?: false` and the
+changeset's tenant: each emission pays one extra load, and the tag can carry
+a value the actor may not read. A calculation is loaded without arguments, so
+give every argument it takes a default. The value is read when the change
+emits; inside an open transaction it includes that transaction's uncommitted
+writes. The record the action returns does not carry it; load it yourself
+when the caller needs it.
+
+The load passes no actor and none of the changeset's context, so a
+calculation reading `^actor(...)` or `^context(...)` sees `nil`; never tag
+with one. A `sum`, `max`, `min`, `first` or `avg` aggregate over no related
+rows is `nil` unless it declares `default:`, and its tag is left off. Give
+such an aggregate a `default:` before closing its tag, or every emission for
+a record without related rows is logged and lost.
 
 When the attribute `AshMetrics.increment_on_change/2` or
 `AshMetrics.increment_on_write/2` counts holds a value its closed tag does not
@@ -95,14 +112,23 @@ declare, the change **skips the emission silently**: nothing is counted and
 nothing is logged. Enumerate every value the attribute can hold, or the
 counter quietly undercounts.
 
-Every other rejected emission from a change is logged, not raised. A closed
-tag read off the record holding an undeclared value, or left off because it
-is `nil`, makes `AshMetrics.increment/3` or `AshMetrics.observe/4` raise
-`ArgumentError` inside the change; so does anything else that raises, throws
-or exits while a change emits, such as a failing custom tag extractor. The
-change logs it at error level as `AshMetrics did not emit ...` with the
-resource, the action and the metric, emits nothing, and leaves the action's
-result alone. Called by hand, the same two functions raise to the caller.
+Every other rejected emission from a change is logged, not raised, bar the
+one the next paragraph names. A closed tag read from the record holding an
+undeclared value, or left off because it is `nil`, makes
+`AshMetrics.increment/3` or `AshMetrics.observe/4` raise `ArgumentError`
+inside the change; so does anything else that raises, throws or exits while
+a change emits, such as a failing custom tag extractor or, with no
+transaction open, a calculation that fails to load. The change logs it at
+error level as `AshMetrics did not emit ...` with the resource, the action
+and the metric, emits nothing, and leaves the action's result alone. Called
+by hand, the same two functions raise to the caller.
+
+A calculation or aggregate a tag names that fails to load while a
+transaction is open is not logged: it rolls that transaction back. The call
+that opened the transaction returns `{:error, %Ash.Error.Unknown{}}` holding
+an `AshMetrics.Changes.TagLoadError`, and nothing written within the
+transaction persists, bulk actions included. Tag only with calculations and
+aggregates that cannot fail on the data the action writes.
 
 An open tag filled this way carries whatever the row holds, one timeseries
 per distinct value. Name a bounded attribute, or close it with `values:`;

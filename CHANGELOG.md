@@ -8,6 +8,24 @@ and this project adheres to
 
 ## [Unreleased]
 
+### Added
+
+- `AshMetrics.Changes.IncrementOnChange`,
+  `AshMetrics.Changes.IncrementOnWrite` and
+  `AshMetrics.Changes.ObserveElapsed` read a tag that names a calculation or
+  an aggregate of the resource, loading it for every record they emit for
+  with `authorize?: false` and the changeset's tenant. A metric whose tags
+  name none loads nothing. A load that fails is logged, except while a
+  transaction is open, which it rolls back with the new
+  `AshMetrics.Changes.TagLoadError`.
+
+### Changed
+
+- An open tag naming a calculation or an aggregate, which compiled cleanly
+  and was left off the emission, is now loaded and carried by the action
+  changes, once for every record they emit for; a load that fails while a
+  transaction is open rolls that transaction back.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added

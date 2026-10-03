@@ -203,12 +203,14 @@ end
 `increment_on_change/2` counts one `delivery` whenever the action leaves
 `status` holding a value the record did not have before, tagged with that
 value and with every other declared tag of the counter that names an
-attribute of the record or a `path:` into one. `observe_elapsed/2`
+attribute, a calculation or an aggregate of the resource, or a `path:` into
+an attribute. `observe_elapsed/2`
 records the time between two timestamps of the written record into
 `delivery_time`, in that distribution's unit; `where:` narrows it to the one
 transition that means delivered. Both take their extractor metadata from the
 changeset, emit nothing when the action fails, bar one case inside a
-surrounding transaction, and never alter its result. See
+surrounding transaction, and leave its result alone, bar a calculation or
+aggregate that fails to load there. See
 `AshMetrics.Changes.IncrementOnChange` and `AshMetrics.Changes.ObserveElapsed`.
 
 `increment_on_write/2` counts every write of the attribute instead of every
@@ -223,12 +225,15 @@ update :record_attempt do
 end
 ```
 
-Three caveats. An open tag that names an attribute, or declares a `path:`, is
-read off the written record and carries whatever the row holds, one timeseries
-per distinct value; name a bounded attribute or close the tag with `values:`.
-A value outside a closed tag's declared set is not counted and never fails the
-action: a status the counter does not enumerate is skipped silently, and any
-other rejected emission is logged at error level. And
+Four caveats. An open tag that names an attribute, a calculation or an
+aggregate, or declares a `path:`, is read from the written record and carries
+whatever it holds, one timeseries per distinct value; name a bounded field or
+close the tag with `values:`. A tag that names a calculation or an aggregate
+costs one load for every record the change emits for, without authorization;
+see `AshMetrics.Dsl.Tags`. A value outside a closed tag's declared set is not
+counted and never fails the action: a status the counter does not enumerate is
+skipped silently, and any other rejected emission is logged at error level,
+except the failed load inside an open transaction described above.
 `increment_on_change/2` refuses to run atomically: the action needs
 `require_atomic? false`, and `Ash.bulk_update/4` needs `:stream` among its
 strategies, or it emits nothing and returns

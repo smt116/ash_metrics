@@ -8,5 +8,6 @@ defmodule AshMetrics.Test.Pg do
     resource AshMetrics.Test.PgJob
     resource AshMetrics.Test.PgObanJob
     resource AshMetrics.Test.PgTicket
+    resource AshMetrics.Test.PgTicketComment
   end
 end

@@ -10,9 +10,9 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   `AshMetrics.observe/4`, in the distribution's declared `unit`, which must be
   one of `AshMetrics.Dsl.Distribution.time_units/0`. `to` defaults to `:now`,
   the moment the hook runs. A negative result is observed as it is. An
-  action that fails observes nothing, and the change never alters the
-  action's result. When it observes within a transaction, including the one
-  case in which a failing action still observes, is that of
+  action that fails observes nothing. Its timing within a transaction,
+  including the one case in which a failing action still observes and the
+  one in which a failed load rolls the transaction back, is that of
   `AshMetrics.Changes.IncrementOnChange`, "Transactions".
 
   Nothing is observed when either timestamp is `nil` on the record. Restrict
@@ -23,15 +23,16 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   `NaiveDateTime` compared with a `DateTime` is read as UTC.
 
   The observation carries every declared tag of the distribution that is read
-  off the record — by attribute name, or at the `path:` the tag declares, as
-  `AshMetrics.Dsl.Tags` documents — and whatever the configured
-  `AshMetrics.TagExtractor` derives from the changeset's context, its tenant,
-  the resource and the action name.
+  from the record — by the name of an attribute, calculation or aggregate, or
+  at the `path:` the tag declares, as `AshMetrics.Dsl.Tags` documents — and
+  whatever the configured `AshMetrics.TagExtractor` derives from the
+  changeset's context, its tenant, the resource and the action name.
 
   An observation that raises, throws or exits, whether `AshMetrics.observe/4`
-  rejects it or the tag extractor fails, is logged at error level with the
-  resource, the action and the distribution; the action's result is never
-  altered.
+  rejects it, a calculation or aggregate a tag names fails to load or the tag
+  extractor fails, is logged at error level with the resource, the action and
+  the distribution, and the action's result is left alone, bar a load that
+  fails while a transaction is open.
 
   ## Atomics
 
@@ -50,6 +51,7 @@ defmodule AshMetrics.Changes.ObserveElapsed do
 
   alias Ash.Changeset
   alias AshMetrics.Changes.Emission
+  alias AshMetrics.Changes.TagLoadError
   alias AshMetrics.Dsl.Distribution
   alias AshMetrics.Info
 
@@ -78,7 +80,8 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   @spec atomic?() :: true
   def atomic?, do: true
 
-  @spec observe(Changeset.t(), keyword(), Ash.Resource.record()) :: :ok
+  @spec observe(Changeset.t(), keyword(), Ash.Resource.record()) ::
+          :ok | {:error, TagLoadError.t()}
   defp observe(changeset, opts, record) do
     Emission.emit(changeset, opts[:distribution], fn ->
       distribution = Info.metric!(changeset.resource, opts[:distribution])
@@ -90,7 +93,7 @@ defmodule AshMetrics.Changes.ObserveElapsed do
           changeset.resource,
           distribution.name,
           elapsed(to, from, unit!(distribution)),
-          tags: Emission.record_tags(changeset.resource, record, distribution),
+          tags: Emission.record_tags(changeset, record, distribution),
           metadata: Emission.metadata(changeset)
         )
       end
