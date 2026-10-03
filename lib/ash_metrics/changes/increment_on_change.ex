@@ -11,6 +11,11 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   value it wrote. An action that fails emits nothing, and the change leaves
   the action's result alone, except as "Transactions" below describes.
 
+  The change may sit on a create, an update or a destroy action. A destroy
+  compares as an update does, so it emits only when it writes the attribute a
+  new value, and its tags are read from the destroyed record; see
+  `AshMetrics.Verifiers.VerifyChanges` for the tags a destroy cannot read.
+
   The emission carries the attribute as a tag, every other declared tag of the
   counter that is read from the record — by the name of an attribute,
   calculation or aggregate, or at the `path:` the tag declares, as

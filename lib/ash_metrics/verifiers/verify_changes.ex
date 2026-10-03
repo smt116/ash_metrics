@@ -23,6 +23,17 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   * every closed tag of the distribution names an attribute, a calculation or
     an aggregate of the resource or declares a `path:`
 
+  For all three, on a destroy action that is not `soft? true`, and for a
+  resource-level change whose `on` includes `:destroy` on a resource with such
+  an action:
+
+  * no tag of the metric, other than the attribute an increment change
+    counts, names a calculation or an aggregate, by its key or by the first
+    segment of its `path:`. A destroy deletes the row before the change
+    emits: an aggregate, or a calculation reading related data, is not
+    loaded or loads as `nil`, and the tag is left off. A tag naming an
+    attribute is read from the destroyed record.
+
   See `AshMetrics` for how a verifier failure is reported.
   """
 
@@ -81,7 +92,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
        when module in [IncrementOnChange, IncrementOnWrite] do
     with {:ok, counter} <- metric(dsl_state, source, change, opts[:counter], Counter),
          :ok <- verify_attribute(dsl_state, source, change, counter, opts[:attribute]),
-         do: verify_closed_tags(dsl_state, source, change, counter)
+         :ok <- verify_closed_tags(dsl_state, source, change, counter),
+         do: verify_destroy_tags(dsl_state, source, change, counter, [opts[:attribute]])
   end
 
   defp verify_change(dsl_state, source, %Change{change: {ObserveElapsed, opts}} = change) do
@@ -89,7 +101,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
            metric(dsl_state, source, change, opts[:distribution], Distribution),
          :ok <- verify_unit(dsl_state, source, change, distribution),
          :ok <- verify_timestamps(dsl_state, source, change, opts),
-         do: verify_closed_tags(dsl_state, source, change, distribution)
+         :ok <- verify_closed_tags(dsl_state, source, change, distribution),
+         do: verify_destroy_tags(dsl_state, source, change, distribution, [])
   end
 
   defp verify_change(_dsl_state, _source, _change), do: :ok
@@ -243,6 +256,75 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           ResourceInfo.aggregate(dsl_state, tag)
       )
   end
+
+  @spec verify_destroy_tags(
+          map(),
+          source(),
+          Change.t(),
+          Counter.t() | Distribution.t(),
+          [atom()]
+        ) :: :ok | {:error, Exception.t()}
+  defp verify_destroy_tags(dsl_state, source, change, metric, counted) do
+    with destroy when not is_nil(destroy) <- hard_destroy(dsl_state, source, change),
+         {tag, kind, name} <- derived_tag(dsl_state, metric, counted) do
+      error(
+        dsl_state,
+        source,
+        change,
+        "#{on_destroy(source, destroy)} emits #{inspect(metric.name)}, whose tag " <>
+          "#{inspect(tag)} reads the #{kind} #{inspect(name)}. A destroy deletes " <>
+          "the row before the change emits: an aggregate, or a calculation " <>
+          "reading related data, is not loaded or loads as `nil`, and the " <>
+          "tag is left off. Tag " <>
+          "that #{kind(metric)} with attributes only, or emit it by hand."
+      )
+    else
+      _none -> :ok
+    end
+  end
+
+  # The destroy action, other than a soft one, that the change runs on.
+  @spec hard_destroy(map(), source(), Change.t()) :: atom() | nil
+  defp hard_destroy(dsl_state, nil, %Change{on: on}) do
+    if :destroy in List.wrap(on) do
+      dsl_state
+      |> ResourceInfo.actions()
+      |> Enum.find_value(&(hard_destroy?(&1) && &1.name))
+    end
+  end
+
+  defp hard_destroy(dsl_state, action, _change) do
+    if hard_destroy?(ResourceInfo.action(dsl_state, action)), do: action
+  end
+
+  @spec hard_destroy?(struct() | nil) :: boolean()
+  defp hard_destroy?(%{type: :destroy, soft?: soft?}), do: not soft?
+  defp hard_destroy?(_action), do: false
+
+  # The first tag of the metric, other than the counted attribute, whose key or
+  # first path segment names a calculation or an aggregate.
+  @spec derived_tag(map(), Counter.t() | Distribution.t(), [atom()]) ::
+          {atom(), String.t(), atom()} | nil
+  defp derived_tag(dsl_state, metric, counted) do
+    metric.tags
+    |> Enum.reject(&(&1 in counted))
+    |> Enum.find_value(fn tag ->
+      name = metric.tag_paths |> Map.get(tag, [tag]) |> List.first()
+
+      cond do
+        is_nil(name) or ResourceInfo.attribute(dsl_state, name) -> nil
+        ResourceInfo.calculation(dsl_state, name) -> {tag, "calculation", name}
+        ResourceInfo.aggregate(dsl_state, name) -> {tag, "aggregate", name}
+        true -> nil
+      end
+    end)
+  end
+
+  @spec on_destroy(source(), atom()) :: String.t()
+  defp on_destroy(nil, destroy),
+    do: "the resource-level change runs on the destroy action #{inspect(destroy)} and"
+
+  defp on_destroy(action, _destroy), do: "action #{inspect(action)} is a destroy and"
 
   @spec where(source()) :: String.t()
   defp where(nil), do: "the resource-level change"

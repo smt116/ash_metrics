@@ -36,6 +36,10 @@ and this project adheres to
   naming a calculation or an aggregate whose type is a list, a map, a struct
   or an embedded resource. A declaration that compiled cleanly may now emit
   a compiler warning.
+- `AshMetrics.Verifiers.VerifyChanges` rejects an action change on a destroy
+  action that is not `soft? true` whose metric reads a tag from a calculation
+  or an aggregate. A declaration that compiled cleanly may now emit a
+  compiler warning.
 
 ## [0.5.0] - 2026-10-01
 

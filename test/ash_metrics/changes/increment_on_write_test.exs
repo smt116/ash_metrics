@@ -43,6 +43,16 @@ defmodule AshMetrics.Changes.IncrementOnWriteTest do
     assert_metric_emitted(@metric, tags: %{status: :open})
   end
 
+  test "a destroy emits the value the record held, with its other tags" do
+    ticket = submit!(priority: :high, assignee: "ana")
+    assert_metric_emitted(@metric, tags: %{status: :open})
+
+    assert :ok = Ash.destroy(ticket, action: :discard)
+
+    assert {%{count: 1}, tags} = assert_metric_emitted(@metric)
+    assert tags == %{status: :open, priority: :high, assignee: "ana"}
+  end
+
   test "a value outside the counter's closed set emits nothing" do
     ticket = submit!(priority: :low, assignee: "ana")
     assert_metric_emitted(@metric, tags: %{status: :open})

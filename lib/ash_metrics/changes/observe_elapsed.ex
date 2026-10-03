@@ -19,6 +19,10 @@ defmodule AshMetrics.Changes.ObserveElapsed do
   the change to a particular transition with `where:` on the `change`
   declaration.
 
+  The change may sit on the actions `AshMetrics.Changes.IncrementOnChange`
+  may. On a destroy, both timestamps and the tags are read from the destroyed
+  record, and `:now` is the moment the hook runs, after the row is deleted.
+
   The two timestamps may be `DateTime` or `NaiveDateTime` values; a
   `NaiveDateTime` compared with a `DateTime` is read as UTC.
 

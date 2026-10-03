@@ -56,6 +56,14 @@ defmodule AshMetrics.Changes.ObserveElapsedTest do
     assert value >= 0
   end
 
+  test "measures to now from a destroy, tagged from the destroyed record", %{ticket: ticket} do
+    assert :ok = Ash.destroy(ticket, action: :discard)
+
+    assert {%{value: value}, tags} = assert_metric_emitted(@metric)
+    assert value >= 0
+    assert tags == %{priority: :high}
+  end
+
   test "measures between a utc and a naive timestamp", %{ticket: ticket} do
     acknowledged_at =
       ticket.inserted_at

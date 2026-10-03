@@ -5,7 +5,8 @@ defmodule AshMetrics.Test.PgTicket do
   # updates and bulk creates for real, plus aggregates over
   # `AshMetrics.Test.PgTicketComment` and an expression calculation over them
   # that a counter tags with, and two calculations that fail to load, one in
-  # Postgres and one in Elixir, each tagging a counter of its own.
+  # Postgres and one in Elixir, each tagging a counter of its own, and a
+  # destroy action carrying a change.
   use Ash.Resource,
     domain: AshMetrics.Test.Pg,
     data_layer: AshPostgres.DataLayer,
@@ -138,6 +139,11 @@ defmodule AshMetrics.Test.PgTicket do
       accept [:status]
 
       change AshMetrics.increment_on_write(:reviews, :status)
+    end
+
+    # Counts the status the destroyed row held, tagged with attributes only.
+    destroy :discard do
+      change AshMetrics.increment_on_write(:transitions, :status)
     end
 
     # Both atomic-capable changes on one action that keeps Ash's default

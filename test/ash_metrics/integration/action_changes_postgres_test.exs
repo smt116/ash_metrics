@@ -10,6 +10,7 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
 
   alias Ash.BulkResult
   alias Ash.Error.Invalid.NoMatchingBulkStrategy
+  alias AshMetrics.Changes.Emission
   alias AshMetrics.Changes.TagLoadError
   alias AshMetrics.Test.PgTicket
   alias AshMetrics.Test.PgTicketComment
@@ -382,6 +383,34 @@ defmodule AshMetrics.Integration.ActionChangesPostgresTest do
       assert log =~ "division by zero"
       assert Enum.map(Ash.read!(PgTicket), & &1.status) == [:in_progress, :in_progress]
       refute_metric_emitted(@audits)
+    end
+  end
+
+  describe "a destroy" do
+    test "emits the value the destroyed row held, with its attribute tags" do
+      ticket = open!("ana")
+      drain()
+
+      assert :ok = Ash.destroy(ticket, action: :discard)
+
+      assert {%{count: 1}, tags} = assert_metric_emitted(@transitions)
+      assert tags == %{status: :open, priority: :low, assignee: "ana"}
+      assert [] = Ash.read!(PgTicket)
+    end
+
+    test "leaves off the tags read from aggregates and calculations over related rows" do
+      ticket = open!("ana")
+      changeset = Ash.Changeset.for_destroy(ticket, :destroy)
+      destroyed = Ash.destroy!(changeset, return_destroyed?: true)
+
+      tags =
+        Emission.record_tags(
+          changeset,
+          destroyed,
+          AshMetrics.Info.metric!(PgTicket, :escalations)
+        )
+
+      assert tags == %{status: :open}
     end
   end
 

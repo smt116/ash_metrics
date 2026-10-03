@@ -10,11 +10,12 @@ defmodule AshMetrics.Changes.IncrementOnWrite do
   `AshMetrics.increment/3` for the attribute's value on the record. An action
   that fails emits nothing.
 
-  The tags the emission carries, the closed-tag value it skips, the logging of
-  an emission that fails, and when it emits within a transaction, including
-  the one case in which a failing action still emits and the one in which a
-  failed load rolls the transaction back, are those of
-  `AshMetrics.Changes.IncrementOnChange`.
+  The actions it may sit on, the tags the emission carries, the closed-tag
+  value it skips, the logging of an emission that fails, and when it emits
+  within a transaction, including the one case in which a failing action still
+  emits and the one in which a failed load rolls the transaction back, are
+  those of `AshMetrics.Changes.IncrementOnChange`. A destroy counts the value
+  the destroyed record holds.
 
   ## Atomics
 

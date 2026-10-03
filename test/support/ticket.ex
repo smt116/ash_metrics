@@ -1,8 +1,9 @@
 defmodule AshMetrics.Test.Ticket do
   @moduledoc false
   # The resource the action changes are exercised against: a status an action
-  # writes, two more attributes the counter tags with, and the timestamps the
-  # elapsed distribution measures between.
+  # writes, two more attributes the counter tags with, the timestamps the
+  # elapsed distribution measures between, and destroy actions carrying the
+  # changes.
   use Ash.Resource,
     domain: AshMetrics.Test.Queue,
     data_layer: Ash.DataLayer.Ets,
@@ -123,6 +124,20 @@ defmodule AshMetrics.Test.Ticket do
                to: :resolved_at
              ),
              where: [attribute_equals(:status, :resolved)]
+    end
+
+    # Counts the status the destroyed row held and measures its age.
+    destroy :discard do
+      change AshMetrics.increment_on_write(:transitions, :status)
+      change AshMetrics.observe_elapsed(:time_to_resolve, from: :inserted_at)
+    end
+
+    # Writes a last status as it destroys the row.
+    destroy :close_out do
+      require_atomic? false
+
+      change set_attribute(:status, :closed)
+      change AshMetrics.increment_on_change(:transitions, :status)
     end
 
     # Carries the change while touching another attribute, so that a status

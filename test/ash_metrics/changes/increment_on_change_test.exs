@@ -72,6 +72,16 @@ defmodule AshMetrics.Changes.IncrementOnChangeTest do
     assert_metric_emitted(@metric, tags: %{status: :resolved, priority: :low})
   end
 
+  test "a destroy writing a new value emits it, with the record's other tags" do
+    ticket = open!(priority: :low, assignee: "ana")
+    assert_metric_emitted(@metric, tags: %{status: :open})
+
+    assert :ok = Ash.destroy(ticket, action: :close_out)
+
+    assert {%{count: 1}, tags} = assert_metric_emitted(@metric)
+    assert tags == %{status: :closed, priority: :low, assignee: "ana"}
+  end
+
   test "an update that leaves the attribute alone emits nothing" do
     ticket = open!(priority: :low, assignee: "ana")
     assert_metric_emitted(@metric, tags: %{status: :open})

@@ -106,6 +106,19 @@ defmodule AshMetrics.Changes.DerivedTagsTest do
                Emission.record_tags(changeset, stale, counter)
     end
 
+    test "leaves an aggregate off a destroyed record and computes a calculation over its attributes" do
+      parcel = receive!(5)
+      changeset = Ash.Changeset.for_destroy(parcel, :destroy)
+      destroyed = Ash.destroy!(changeset, return_destroyed?: true)
+      counter = AshMetrics.Info.metric!(Parcel, :receptions)
+
+      tags = Emission.record_tags(changeset, destroyed, counter)
+
+      assert %{size: :small, hidden_size: :small} = tags
+      refute Map.has_key?(tags, :scan_count)
+      refute Map.has_key?(tags, :scanned)
+    end
+
     test "raises an Ash error a load throws as the data layer's rollback" do
       parcel = receive!(5)
       changeset = Ash.Changeset.for_update(parcel, :deliver, %{})

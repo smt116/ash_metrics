@@ -108,6 +108,14 @@ rows is `nil` unless it declares `default:`, and its tag is left off. Give
 such an aggregate a `default:` before closing its tag, or every emission for
 a record without related rows is logged and lost.
 
+The changes may sit on create, update and destroy actions. On a destroy
+that is not `soft? true`, tag the metric from attributes only: the row is
+deleted before the change emits, so an aggregate, or a calculation reading
+related data, is not loaded or loads as `nil`, and its tag is left off; a
+verifier rejects a tag naming a calculation or an aggregate there.
+`AshMetrics.increment_on_change/2` on a destroy counts only when the destroy
+writes the attribute a new value.
+
 When the attribute `AshMetrics.increment_on_change/2` or
 `AshMetrics.increment_on_write/2` counts holds a value its closed tag does not
 declare, the change **skips the emission silently**: nothing is counted and

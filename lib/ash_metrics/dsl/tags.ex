@@ -74,7 +74,9 @@ defmodule AshMetrics.Dsl.Tags do
 
   A load that fails is logged, or rolls back the transaction open when it
   fails, as `AshMetrics.Changes.IncrementOnChange`, "Transactions",
-  documents.
+  documents. `AshMetrics.Verifiers.VerifyChanges` rejects a tag read from a
+  calculation or an aggregate by a change on a destroy action that is not
+  soft.
 
   `AshMetrics.Verifiers.VerifyMetrics` checks every tag the changes read, with
   or without a path, against the resource while it compiles.

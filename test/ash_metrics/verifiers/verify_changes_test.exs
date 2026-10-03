@@ -374,6 +374,145 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
     end
   end
 
+  describe "a change on a destroy action" do
+    test "may not read a tag from a calculation" do
+      assert [%DslError{path: [:actions, :discard]} = error] =
+               destroy_errors(
+                 quote(do: counter(:transitions, tags: [:status, :size])),
+                 quote do
+                   destroy :discard do
+                     change AshMetrics.increment_on_write(:transitions, :status)
+                   end
+                 end
+               )
+
+      message = Exception.message(error)
+
+      assert message =~
+               "action :discard is a destroy and emits :transitions, whose tag :size " <>
+                 "reads the calculation :size"
+
+      assert message =~
+               "A destroy deletes the row before the change emits: an aggregate, " <>
+                 "or a calculation reading related data, is not loaded or loads as " <>
+                 "`nil`, and the tag is left off."
+
+      assert message =~ "Tag that counter with attributes only, or emit it by hand."
+    end
+
+    test "may not read a tag at a path starting at a calculation" do
+      assert [%DslError{} = error] =
+               destroy_errors(
+                 quote(
+                   do: counter(:transitions, tags: [:status, state: [path: [:route, :state]]])
+                 ),
+                 quote do
+                   destroy :discard do
+                     change AshMetrics.increment_on_write(:transitions, :status)
+                   end
+                 end
+               )
+
+      assert Exception.message(error) =~ "whose tag :state reads the calculation :route"
+    end
+
+    test "may not read a tag from an aggregate" do
+      assert [%DslError{} = error] =
+               destroy_errors(
+                 quote(
+                   do:
+                     distribution(:lifetime,
+                       unit: :millisecond,
+                       tags: [scanned: [true, false]]
+                     )
+                 ),
+                 quote do
+                   destroy :discard do
+                     change AshMetrics.observe_elapsed(:lifetime, from: :inserted_at)
+                   end
+                 end,
+                 [
+                   quote do
+                     relationships do
+                       has_many :scans, AshMetrics.Test.ParcelScan,
+                         destination_attribute: :parcel_id
+                     end
+                   end,
+                   quote do
+                     aggregates do
+                       exists :scanned, :scans
+                     end
+                   end
+                 ],
+                 Ash.DataLayer.Ets
+               )
+
+      message = Exception.message(error)
+
+      assert message =~ "emits :lifetime, whose tag :scanned reads the aggregate :scanned"
+      assert message =~ "Tag that distribution with attributes only"
+    end
+
+    test "may read its tags from attributes" do
+      assert destroy_errors(
+               quote(do: counter(:transitions, tags: [:status, :assignee])),
+               quote do
+                 destroy :discard do
+                   change AshMetrics.increment_on_write(:transitions, :status)
+                   change AshMetrics.increment_on_change(:transitions, :status)
+                 end
+               end
+             ) == []
+    end
+
+    test "may read a tag from a calculation on a soft destroy" do
+      assert destroy_errors(
+               quote(do: counter(:transitions, tags: [:status, :size])),
+               quote do
+                 destroy :archive do
+                   soft? true
+
+                   change AshMetrics.increment_on_write(:transitions, :status)
+                 end
+               end
+             ) == []
+    end
+
+    test "is checked for a resource-level change that runs on destroys" do
+      assert [%DslError{path: [:changes]} = error] =
+               destroy_errors(
+                 quote(do: counter(:transitions, tags: [:status, :size])),
+                 quote(do: destroy(:discard)),
+                 [
+                   quote do
+                     changes do
+                       change AshMetrics.increment_on_write(:transitions, :status),
+                         on: [:update, :destroy]
+                     end
+                   end
+                 ]
+               )
+
+      assert Exception.message(error) =~
+               "the resource-level change runs on the destroy action :discard and " <>
+                 "emits :transitions, whose tag :size reads the calculation :size"
+    end
+
+    test "a resource-level change that does not run on destroys is left alone" do
+      assert destroy_errors(
+               quote(do: counter(:transitions, tags: [:status, :size])),
+               quote(do: destroy(:discard)),
+               [
+                 quote do
+                   changes do
+                     change AshMetrics.increment_on_write(:transitions, :status)
+                   end
+                 end
+               ]
+             ) == []
+    end
+  end
+
   # An `update` action carrying `change`, on a resource with a `status`
   # attribute, which is what every declaration under test is attached to.
   # `blocks` are further resource blocks, quoted.
@@ -397,6 +536,43 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
         end
         | blocks
       ]
+    )
+  end
+
+  # A resource with a `status`, an `assignee` and an `inserted_at` attribute,
+  # a calculation returning an atom and one returning an embedded resource,
+  # and `actions` as its actions block. `blocks` are further resource blocks,
+  # quoted, compiled on `data_layer`.
+  defp destroy_errors(metrics, actions, blocks \\ [], data_layer \\ Ash.DataLayer.Simple) do
+    Compiler.dsl_errors(
+      quote do
+        metrics do
+          unquote(metrics)
+        end
+      end,
+      [
+        quote(do: attribute(:status, :atom)),
+        quote(do: attribute(:assignee, :string)),
+        quote(do: attribute(:inserted_at, :utc_datetime_usec))
+      ],
+      [
+        quote do
+          actions do
+            unquote(actions)
+          end
+        end,
+        quote do
+          calculations do
+            calculate :size, :atom, expr(:small)
+
+            calculate :route, AshMetrics.Test.Location, fn records, _context ->
+              Enum.map(records, fn _record -> nil end)
+            end
+          end
+        end
+        | blocks
+      ],
+      data_layer
     )
   end
 
