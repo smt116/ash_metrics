@@ -21,9 +21,11 @@ defmodule AshMetrics.Dsl.Tags do
 
   ## Paths
 
-  A path is a list of at least one attribute name descending through the
-  resource's embedded attributes: `[:location, :shipping_address, :state]`
-  names the `state` of the `shipping_address` of a record's `location`.
+  A path is a list of at least one field name. The first names an attribute,
+  a calculation or an aggregate of the resource, and each further one an
+  attribute of the embedded resource the previous one holds:
+  `[:location, :shipping_address, :state]` names the `state` of the
+  `shipping_address` of a record's `location`.
 
   The key is the tag's name. It need not be an attribute of the resource, and
   a call site passing the tag to `AshMetrics.increment/3` or
@@ -44,7 +46,7 @@ defmodule AshMetrics.Dsl.Tags do
   when the value the walk arrives at is a map or a struct.
 
   An open tag read this way carries whatever the row holds, one timeseries
-  per distinct value. Name a bounded attribute, or close the tag with
+  per distinct value. Name a bounded field, or close the tag with
   `values:`; a free-text or user-entered attribute is neither.
 
   ## Calculations and aggregates
@@ -74,8 +76,8 @@ defmodule AshMetrics.Dsl.Tags do
   fails, as `AshMetrics.Changes.IncrementOnChange`, "Transactions",
   documents.
 
-  `AshMetrics.Verifiers.VerifyMetrics` checks a path against the resource's
-  attributes while it compiles.
+  `AshMetrics.Verifiers.VerifyMetrics` checks every tag the changes read, with
+  or without a path, against the resource while it compiles.
   """
 
   alias AshMetrics.Dsl.Counter

@@ -10,12 +10,18 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * tag keys do not collide with the keys the configured
     `AshMetrics.TagExtractor` adds
   * a closed tag declares at least one value, and no value twice
-  * a tag's `path` starts at an attribute of the resource, descends through
-    embedded resources, never through a list, and ends at an attribute that
-    is neither an embedded resource nor a map
+  * a tag's `path` starts at an attribute, a calculation or an aggregate of
+    the resource, descends through embedded resources, never through a list,
+    and ends at a field that is neither an embedded resource nor a map
   * a tag with no `path` does not name an attribute whose type is an embedded
-    resource, a map, a struct or a keyword list, which the action changes
+    resource, a map, a struct or a keyword list, nor a calculation or an
+    aggregate whose type is one of those or a list, which the action changes
     could never read a value from
+  * a calculation a tag or the start of a path names takes no argument that
+    is `allow_nil? false` and has no default
+  * an aggregate a tag or the start of a path names is not a `list`
+    aggregate; an aggregate whose type depends on a resource that is not
+    compiled when the verifier runs is accepted unchecked
   * bucket boundaries are a non-empty, strictly ascending list of positive
     numbers
   * a distribution's name suffix is a non-empty atom holding no dot, so that
@@ -125,12 +131,30 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     dsl_state |> ResourceInfo.attributes() |> Enum.map(& &1.name) |> list()
   end
 
+  defp fields(dsl_state) do
+    calculations = dsl_state |> ResourceInfo.calculations() |> Enum.map(& &1.name)
+    aggregates = dsl_state |> ResourceInfo.aggregates() |> Enum.map(& &1.name)
+
+    "Declared attributes: #{attributes(dsl_state)}; calculations: " <>
+      "#{list(calculations)}; aggregates: #{list(aggregates)}"
+  end
+
+  # What a tag's key, or the first segment of its path, names on the resource.
+  defp field(dsl_state, name) do
+    cond do
+      attribute = ResourceInfo.attribute(dsl_state, name) -> {:attribute, attribute}
+      calculation = ResourceInfo.calculation(dsl_state, name) -> {:calculation, calculation}
+      aggregate = ResourceInfo.aggregate(dsl_state, name) -> {:aggregate, aggregate}
+      true -> nil
+    end
+  end
+
   defp verify_tags(dsl_state, metric) do
     with :ok <- verify_unique_tags(dsl_state, metric),
          :ok <- verify_reserved_tags(dsl_state, metric),
          :ok <- verify_tag_values(dsl_state, metric),
          :ok <- verify_tag_paths(dsl_state, metric),
-         do: verify_map_typed_tags(dsl_state, metric)
+         do: verify_pathless_tags(dsl_state, metric)
   end
 
   defp verify_unique_tags(dsl_state, metric) do
@@ -215,23 +239,124 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
       dsl_state,
       metric,
       "#{kind(metric)} #{inspect(metric.name)} declares an empty path for the " <>
-        "tag #{inspect(tag)}. A path names an attribute of this resource, then " <>
-        "an attribute of each embedded resource it descends into."
+        "tag #{inspect(tag)}. A path names an attribute, calculation or " <>
+        "aggregate of this resource, then an attribute of each embedded " <>
+        "resource it descends into."
     )
   end
 
   defp verify_path(dsl_state, metric, tag, [first | rest]) do
-    case ResourceInfo.attribute(dsl_state, first) do
+    case field(dsl_state, first) do
       nil ->
         error(
           dsl_state,
           metric,
           "#{tagged(metric, tag)} starts at #{inspect(first)}, which is not an " <>
-            "attribute of this resource. Declared attributes: #{attributes(dsl_state)}"
+            "attribute, calculation or aggregate of this resource. " <>
+            fields(dsl_state)
         )
 
-      %{type: type} ->
+      {:attribute, %{type: type}} ->
         verify_segment(dsl_state, metric, tag, first, type, rest)
+
+      {kind, derived} ->
+        verify_derived(dsl_state, metric, tag, kind, derived, fn type ->
+          verify_segment(dsl_state, metric, tag, first, type, rest)
+        end)
+    end
+  end
+
+  # Checks a calculation or an aggregate, then passes its type to `verify`;
+  # `:ok` without calling `verify` when the type cannot be determined.
+  defp verify_derived(dsl_state, metric, tag, kind, derived, verify) do
+    with :ok <- verify_derived(dsl_state, metric, tag, kind, derived) do
+      case derived_type(dsl_state, kind, derived) do
+        {:ok, type} -> verify.(type)
+        :unknown -> :ok
+      end
+    end
+  end
+
+  # A calculation the action changes load must take no required argument, and
+  # an aggregate must not be a list.
+  defp verify_derived(dsl_state, metric, tag, :calculation, calculation) do
+    case Enum.find(calculation.arguments, &required_argument?/1) do
+      nil ->
+        :ok
+
+      argument ->
+        error(
+          dsl_state,
+          metric,
+          "#{kind(metric)} #{inspect(metric.name)} reads the tag #{inspect(tag)} " <>
+            "from the calculation #{inspect(calculation.name)}, whose argument " <>
+            "#{inspect(argument.name)} is required and has no default. The action " <>
+            "changes load the calculation without arguments: give the argument a " <>
+            "default or `allow_nil? true`."
+        )
+    end
+  end
+
+  defp verify_derived(dsl_state, metric, tag, :aggregate, %{kind: :list} = aggregate) do
+    error(
+      dsl_state,
+      metric,
+      "#{kind(metric)} #{inspect(metric.name)} reads the tag #{inspect(tag)} " <>
+        "from the aggregate #{inspect(aggregate.name)}, which is a list " <>
+        "aggregate. A tag carries one value."
+    )
+  end
+
+  defp verify_derived(_dsl_state, _metric, _tag, :aggregate, _aggregate), do: :ok
+
+  defp required_argument?(argument),
+    do: argument.allow_nil? == false and is_nil(argument.default)
+
+  # The type of a calculation or a non-list aggregate. `:unknown` for an
+  # aggregate whose type depends on a related resource that is not compiled or
+  # on a field that cannot be resolved.
+  defp derived_type(_dsl_state, :calculation, calculation),
+    do: {:ok, Ash.Type.get_type(calculation.type)}
+
+  defp derived_type(_dsl_state, :aggregate, %{kind: :count}), do: {:ok, Ash.Type.Integer}
+  defp derived_type(_dsl_state, :aggregate, %{kind: :exists}), do: {:ok, Ash.Type.Boolean}
+  defp derived_type(_dsl_state, :aggregate, %{kind: :avg}), do: {:ok, Ash.Type.Float}
+
+  defp derived_type(_dsl_state, :aggregate, %{kind: :custom, type: type}),
+    do: {:ok, Ash.Type.get_type(type)}
+
+  defp derived_type(dsl_state, :aggregate, aggregate) do
+    with destination when is_atom(destination) and not is_nil(destination) <-
+           destination(dsl_state, aggregate),
+         true <- compiled?(destination),
+         {:ok, type} when not is_nil(type) <- ResourceInfo.aggregate_type(dsl_state, aggregate) do
+      {:ok, Ash.Type.get_type(type)}
+    else
+      _unknown -> :unknown
+    end
+  end
+
+  # The resource an aggregate reads from, or `nil` when a resource on its
+  # relationship path is not compiled.
+  defp destination(_dsl_state, %{related?: false, resource: resource}), do: resource
+
+  defp destination(dsl_state, %{relationship_path: [first | rest]}) do
+    case ResourceInfo.relationship(dsl_state, first) do
+      %{destination: destination} -> descend(destination, rest)
+      nil -> nil
+    end
+  end
+
+  defp destination(_dsl_state, _aggregate), do: nil
+
+  defp descend(resource, []), do: resource
+
+  defp descend(resource, [next | rest]) do
+    with true <- compiled?(resource),
+         %{destination: destination} <- ResourceInfo.relationship(resource, next) do
+      descend(destination, rest)
+    else
+      _unknown -> nil
     end
   end
 
@@ -301,33 +426,72 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     end
   end
 
-  defp verify_map_typed_tags(dsl_state, metric) do
+  defp verify_pathless_tags(dsl_state, metric) do
     metric.tags
     |> Enum.reject(&Map.has_key?(metric.tag_paths, &1))
-    |> Enum.filter(&map_typed?(dsl_state, &1))
-    |> case do
-      [] ->
-        :ok
+    |> Enum.reduce_while(:ok, fn tag, :ok ->
+      case verify_pathless(dsl_state, metric, tag, field(dsl_state, tag)) do
+        :ok -> {:cont, :ok}
+        {:error, error} -> {:halt, {:error, error}}
+      end
+    end)
+  end
 
-      [tag | _rest] ->
-        %{type: type} = ResourceInfo.attribute(dsl_state, tag)
+  defp verify_pathless(_dsl_state, _metric, _tag, nil), do: :ok
 
+  defp verify_pathless(dsl_state, metric, tag, {:attribute, %{type: type}}) do
+    if map_type?(unwrap(type)) do
+      several_values(dsl_state, metric, tag, :attribute, type)
+    else
+      :ok
+    end
+  end
+
+  defp verify_pathless(dsl_state, metric, tag, {kind, derived}) do
+    verify_derived(dsl_state, metric, tag, kind, derived, fn type ->
+      verify_single_value(dsl_state, metric, tag, kind, type)
+    end)
+  end
+
+  defp verify_single_value(dsl_state, metric, tag, kind, type) do
+    case unwrap(type) do
+      {:array, _item} ->
         error(
           dsl_state,
           metric,
           "#{kind(metric)} #{inspect(metric.name)} declares the tag " <>
-            "#{inspect(tag)}, whose attribute has the type #{inspect(type)}. " <>
-            "A tag carries one value, so no emission could ever carry that " <>
-            "attribute: declare `#{tag}: [path: [#{inspect(tag)}, ...]]` naming " <>
-            "the attribute inside it that holds the value."
+            "#{inspect(tag)}, whose #{kind} has the type #{inspect(type)}, a " <>
+            "list. A tag carries one value."
         )
+
+      unwrapped ->
+        if map_type?(unwrapped) do
+          several_values(dsl_state, metric, tag, kind, type)
+        else
+          :ok
+        end
     end
   end
 
-  defp map_typed?(dsl_state, tag) do
-    case ResourceInfo.attribute(dsl_state, tag) do
-      nil -> false
-      %{type: type} -> map_type?(unwrap(type))
+  defp several_values(dsl_state, metric, tag, kind, type) do
+    error(
+      dsl_state,
+      metric,
+      "#{kind(metric)} #{inspect(metric.name)} declares the tag " <>
+        "#{inspect(tag)}, whose #{kind} has the type #{inspect(type)}. " <>
+        "A tag carries one value, so no emission could ever carry that " <>
+        "#{kind}: " <> several_values_advice(tag, unwrap(type))
+    )
+  end
+
+  defp several_values_advice(tag, type) do
+    if ResourceInfo.resource?(type) do
+      "declare `#{tag}: [path: [#{inspect(tag)}, ...]]` naming the attribute " <>
+        "inside it that holds the value."
+    else
+      "no path reaches inside that type. Give the tag a key that names no " <>
+        "field, for the call site to pass its value, or read it from a " <>
+        "calculation that returns the single value."
     end
   end
 
@@ -395,6 +559,7 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
     |> Enum.map(fn {value, _count} -> value end)
   end
 
+  defp list([]), do: "none"
   defp list(values), do: Enum.map_join(values, ", ", &inspect/1)
 
   defp kind(%Counter{}), do: "counter"

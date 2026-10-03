@@ -15,9 +15,17 @@ defmodule AshMetrics.Test.Compiler do
 
   require Spark.Test
 
-  @spec dsl_errors(Macro.t(), [Macro.t()], [Macro.t()]) :: [Spark.Error.DslError.t()]
-  def dsl_errors(metrics_block, attributes \\ [], blocks \\ []) do
-    metrics_block |> compile_resource(attributes, blocks) |> dsl_errors_for()
+  # `data_layer` replaces `Ash.DataLayer.Simple`, which supports no
+  # aggregates.
+  @spec dsl_errors(Macro.t(), [Macro.t()], [Macro.t()], module()) ::
+          [Spark.Error.DslError.t()]
+  def dsl_errors(
+        metrics_block,
+        attributes \\ [],
+        blocks \\ [],
+        data_layer \\ Ash.DataLayer.Simple
+      ) do
+    metrics_block |> compile_resource(attributes, blocks, data_layer) |> dsl_errors_for()
   end
 
   # Re-verifies a module that is already compiled, which is how a verifier that
@@ -34,13 +42,18 @@ defmodule AshMetrics.Test.Compiler do
   # `attributes` block. A gauge groups by attributes, so a verifier test needs
   # more than the primary key to have anything valid to group by. `blocks` are
   # whole resource blocks, quoted, such as an `actions do` carrying a change.
-  @spec compile_resource(Macro.t(), [Macro.t()], [Macro.t()]) :: module()
-  def compile_resource(metrics_block, attributes \\ [], blocks \\ []) do
+  @spec compile_resource(Macro.t(), [Macro.t()], [Macro.t()], module()) :: module()
+  def compile_resource(
+        metrics_block,
+        attributes \\ [],
+        blocks \\ [],
+        data_layer \\ Ash.DataLayer.Simple
+      ) do
     module = unique_module()
 
     ExUnit.CaptureIO.capture_io(:stderr, fn ->
       Code.compile_quoted(
-        resource(module, metrics_block, attributes, [AshMetrics], blocks),
+        resource(module, metrics_block, attributes, [AshMetrics], blocks, data_layer),
         "nofile"
       )
     end)
@@ -73,8 +86,16 @@ defmodule AshMetrics.Test.Compiler do
     end
   end
 
-  @spec resource(module(), Macro.t(), [Macro.t()], [module()], [Macro.t()]) :: Macro.t()
-  defp resource(module, metrics_block, attributes, extensions, blocks \\ []) do
+  @spec resource(module(), Macro.t(), [Macro.t()], [module()], [Macro.t()], module()) ::
+          Macro.t()
+  defp resource(
+         module,
+         metrics_block,
+         attributes,
+         extensions,
+         blocks \\ [],
+         data_layer \\ Ash.DataLayer.Simple
+       ) do
     ExUnit.Callbacks.on_exit(fn -> purge(module) end)
 
     quote do
@@ -83,7 +104,7 @@ defmodule AshMetrics.Test.Compiler do
         use Ash.Resource,
           domain: nil,
           validate_domain_inclusion?: false,
-          data_layer: Ash.DataLayer.Simple,
+          data_layer: unquote(data_layer),
           extensions: unquote(extensions)
 
         unquote(metrics_block)

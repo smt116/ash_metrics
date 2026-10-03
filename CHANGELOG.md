@@ -18,6 +18,11 @@ and this project adheres to
   name none loads nothing. A load that fails is logged, except while a
   transaction is open, which it rolls back with the new
   `AshMetrics.Changes.TagLoadError`.
+- `AshMetrics.Verifiers.VerifyMetrics` accepts a calculation or an aggregate
+  as a tag without a path and as the first segment of a `path:`, and a path
+  descends into a calculation returning an embedded resource.
+  `AshMetrics.Verifiers.VerifyChanges` accepts a closed tag naming a
+  calculation or an aggregate.
 
 ### Changed
 
@@ -25,6 +30,12 @@ and this project adheres to
   and was left off the emission, is now loaded and carried by the action
   changes, once for every record they emit for; a load that fails while a
   transaction is open rolls that transaction back.
+- `AshMetrics.Verifiers.VerifyMetrics` rejects a tag, or the start of a
+  `path:`, naming a calculation with an argument that is `allow_nil? false`
+  and has no default or naming a `list` aggregate, and a tag without a path
+  naming a calculation or an aggregate whose type is a list, a map, a struct
+  or an embedded resource. A declaration that compiled cleanly may now emit
+  a compiler warning.
 
 ## [0.5.0] - 2026-10-01
 

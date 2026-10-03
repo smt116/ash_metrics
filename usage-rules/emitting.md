@@ -85,19 +85,21 @@ leaves the action atomic.
 
 The changes read every other tag from the record: the attribute, calculation
 or aggregate of the same name, or the `path:` the tag declares. A closed tag
-on such a counter must name an attribute or declare a path, or no emission
-from a change could ever carry it, and a verifier rejects the resource. A tag
-whose value on the record is `nil`, a map or a struct is left off the
-emission.
+on such a counter must name one of those or declare a path, or no emission
+from a change could ever carry it, and a verifier rejects the resource. The
+attribute the change counts must be an attribute, never a calculation or an
+aggregate. A tag whose value on the record is `nil`, a map or a struct is
+left off the emission.
 
 A tag naming a calculation or an aggregate makes the change load it for every
 record it emits for, bulk actions included, with `authorize?: false` and the
 changeset's tenant: each emission pays one extra load, and the tag can carry
 a value the actor may not read. A calculation is loaded without arguments, so
-give every argument it takes a default. The value is read when the change
-emits; inside an open transaction it includes that transaction's uncommitted
-writes. The record the action returns does not carry it; load it yourself
-when the caller needs it.
+give every argument it takes a default; a verifier rejects one with an
+argument that is `allow_nil? false` and has no default. The value is read
+when the change emits; inside an open transaction it includes that
+transaction's uncommitted writes. The record the action returns does not
+carry it; load it yourself when the caller needs it.
 
 The load passes no actor and none of the changeset's context, so a
 calculation reading `^actor(...)` or `^context(...)` sees `nil`; never tag
@@ -131,7 +133,7 @@ transaction persists, bulk actions included. Tag only with calculations and
 aggregates that cannot fail on the data the action writes.
 
 An open tag filled this way carries whatever the row holds, one timeseries
-per distinct value. Name a bounded attribute, or close it with `values:`;
+per distinct value. Name a bounded field, or close it with `values:`;
 never an identifier, a free-text column or anything a user typed.
 
 The changes emit after the action's transaction commits, unless the

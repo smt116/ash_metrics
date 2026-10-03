@@ -10,9 +10,9 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
     gauge or a distribution
   * the attribute is an attribute of the resource
   * the counter declares the attribute as a tag
-  * every closed tag of the counter names an attribute of the resource or
-    declares a `path:`, since the change has nowhere else to read a required
-    tag from
+  * every closed tag of the counter names an attribute, a calculation or an
+    aggregate of the resource or declares a `path:`, since the change has
+    nowhere else to read a required tag from
 
   For `AshMetrics.Changes.ObserveElapsed`:
 
@@ -20,8 +20,8 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
   * `from`, and `to` unless it is `:now`, are datetime attributes of the
     resource
   * the distribution's `unit` is a time unit
-  * every closed tag of the distribution names an attribute of the resource
-    or declares a `path:`
+  * every closed tag of the distribution names an attribute, a calculation or
+    an aggregate of the resource or declares a `path:`
 
   See `AshMetrics` for how a verifier failure is reported.
   """
@@ -226,18 +226,22 @@ defmodule AshMetrics.Verifiers.VerifyChanges do
           source,
           change,
           "#{where(source)} emits #{inspect(metric.name)}, whose closed tag " <>
-            "#{inspect(tag)} is neither an attribute of this resource nor " <>
-            "declares a `path:`. The change reads its tags off the written " <>
-            "record, so no emission could ever carry it. Make it an attribute, " <>
-            "give it a path, open the tag, or emit that #{kind(metric)} by hand."
+            "#{inspect(tag)} names no attribute, calculation or aggregate of " <>
+            "this resource and declares no `path:`. The change reads its tags " <>
+            "from the written record, so no emission could ever carry it. Name " <>
+            "one of those, give it a path, open the tag, or emit that " <>
+            "#{kind(metric)} by hand."
         )
     end
   end
 
   @spec readable?(map(), Counter.t() | Distribution.t(), atom()) :: boolean()
   defp readable?(dsl_state, metric, tag) do
-    not is_nil(ResourceInfo.attribute(dsl_state, tag)) or
-      Map.has_key?(metric.tag_paths, tag)
+    Map.has_key?(metric.tag_paths, tag) or
+      not is_nil(
+        ResourceInfo.attribute(dsl_state, tag) || ResourceInfo.calculation(dsl_state, tag) ||
+          ResourceInfo.aggregate(dsl_state, tag)
+      )
   end
 
   @spec where(source()) :: String.t()

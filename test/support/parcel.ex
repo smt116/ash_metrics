@@ -2,9 +2,10 @@ defmodule AshMetrics.Test.Parcel do
   @moduledoc false
   # The resource the tags read from calculations and aggregates are exercised
   # against: an expression calculation, one taking an argument with a default,
-  # one stored outside the struct, one that raises, one that throws an Ash
-  # error as the data layer's rollback does, and aggregates over
-  # `AshMetrics.Test.ParcelScan`.
+  # one stored outside the struct, one returning an embedded resource a path
+  # descends into, one that raises, one that throws an Ash error as the data
+  # layer's rollback does, and aggregates over
+  # `AshMetrics.Test.ParcelScan`, closed and open.
   use Ash.Resource,
     domain: AshMetrics.Test.Queue,
     data_layer: Ash.DataLayer.Ets,
@@ -17,8 +18,9 @@ defmodule AshMetrics.Test.Parcel do
         :weight_class,
         :hidden_size,
         :scan_count,
-        :scanned,
-        status: [:received, :delivered]
+        route_state: [path: [:route, :state]],
+        status: [:received, :delivered],
+        scanned: [true, false]
       ],
       description: "Parcels received and delivered"
 
@@ -32,7 +34,7 @@ defmodule AshMetrics.Test.Parcel do
 
     distribution :transit_time,
       unit: :millisecond,
-      tags: [:size, :scanned],
+      tags: [size: [:small, :large], scanned: [true, false]],
       description: "Time from receiving a parcel to delivering it"
   end
 
@@ -62,6 +64,10 @@ defmodule AshMetrics.Test.Parcel do
     end
 
     calculate :hidden_size, :atom, expr(if weight > 10, do: :large, else: :small), field?: false
+
+    calculate :route,
+              AshMetrics.Test.Location,
+              fn records, _context -> Enum.map(records, & &1.destination) end
 
     calculate :faulty, :atom, fn _records, _context -> raise "the calculation failed" end
 

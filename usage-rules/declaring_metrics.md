@@ -63,8 +63,10 @@ tags: [{:status, [:queued, :sent, :error]}, :provider, :template]
 ```
 
 An entry written `key: [path: [...]]` says where in the written record the
-action changes read the tag's value, descending through embedded attributes.
-Add `values:` to close it as well:
+action changes read the tag's value: its first segment names an attribute, a
+calculation or an aggregate of the resource, and each further segment an
+attribute of the embedded resource the previous one holds. Add `values:` to
+close it as well:
 
 ```elixir
 tags: [
@@ -108,11 +110,17 @@ that a closed tag lists at least one value and no duplicates, that buckets
 are strictly ascending positive numbers, and that a gauge groups by
 attributes of the resource.
 
-They check a `path:` too: it must start at an attribute of the resource,
-descend through embedded resources only, never through a list, and end at an
-attribute that holds a single value. A tag with no path may not name an
-attribute holding a map, a struct or an embedded resource either — give it a
-path into that attribute, or name the value the call site passes.
+They check a `path:` too: it must start at an attribute, a calculation or an
+aggregate of the resource, descend through embedded resources only, never
+through a list, and end at an attribute that holds a single value. A tag
+with no path may not name an attribute holding a map, a struct or an
+embedded resource, nor a calculation or an aggregate holding one of those or
+a list, either. Give a tag naming an embedded resource a path into one of
+its attributes. No path reaches inside a map or a struct: rename the tag so
+that the call site passes its value, or read it from a calculation that
+returns the single value. A calculation such a tag names may take no
+argument that is `allow_nil? false` without a default, and an aggregate may
+not be a `list` aggregate.
 
 A verifier failure is reported through `IO.warn` as a compiler warning
 pointing at the declaration, not as a hard error. Compile with

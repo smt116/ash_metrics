@@ -45,6 +45,19 @@ defmodule AshMetrics.Changes.DerivedTagsTest do
              }
     end
 
+    test "reads a path into a calculation returning an embedded resource" do
+      Ash.create!(Parcel, %{weight: 5, destination: %{state: :ca}}, action: :receive)
+
+      assert_metric_emitted(@receptions, tags: %{route_state: :ca})
+    end
+
+    test "leaves a path tag off when the calculation returns nil" do
+      receive!(5)
+
+      assert {_measurements, tags} = assert_metric_emitted(@receptions)
+      refute Map.has_key?(tags, :route_state)
+    end
+
     test "computes a calculation from the values the action wrote" do
       receive!(50)
 

@@ -76,8 +76,33 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "whose closed tag :region is neither an attribute of this resource"
+      assert message =~
+               "whose closed tag :region names no attribute, calculation or aggregate of this resource"
+
       assert message =~ "no emission could ever carry it"
+    end
+
+    test "a closed tag may name a calculation or an aggregate" do
+      assert Compiler.dsl_errors_for(AshMetrics.Test.Parcel) == []
+    end
+
+    test "the counted attribute may not be a calculation" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote(do: counter(:transitions, tags: [:size])),
+                 quote(do: change(AshMetrics.increment_on_change(:transitions, :size))),
+                 [],
+                 [
+                   quote do
+                     calculations do
+                       calculate :size, :atom, expr(:small)
+                     end
+                   end
+                 ]
+               )
+
+      assert Exception.message(error) =~
+               "counts :size, which is not an attribute of this resource"
     end
 
     test "an open tag that names no attribute is left alone" do
@@ -184,7 +209,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
                )
 
       assert Exception.message(error) =~
-               "whose closed tag :region is neither an attribute of this resource"
+               "whose closed tag :region names no attribute, calculation or aggregate of this resource"
     end
 
     test "a valid declaration produces no errors" do
@@ -308,7 +333,9 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
       message = Exception.message(error)
 
-      assert message =~ "whose closed tag :region is neither an attribute of this resource"
+      assert message =~
+               "whose closed tag :region names no attribute, calculation or aggregate of this resource"
+
       assert message =~ "emit that distribution by hand"
     end
 
@@ -349,7 +376,8 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
 
   # An `update` action carrying `change`, on a resource with a `status`
   # attribute, which is what every declaration under test is attached to.
-  defp errors(metrics, change, attributes \\ []) do
+  # `blocks` are further resource blocks, quoted.
+  defp errors(metrics, change, attributes \\ [], blocks \\ []) do
     Compiler.dsl_errors(
       quote do
         metrics do
@@ -367,6 +395,7 @@ defmodule AshMetrics.Verifiers.VerifyChangesTest do
             end
           end
         end
+        | blocks
       ]
     )
   end

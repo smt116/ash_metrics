@@ -133,10 +133,11 @@ a call site may pass any value or none at all. A distribution's value is
 measured by the call site, not by the package.
 
 An entry written `key: [path: [...]]` says where in the written record the
-action changes below read the tag's value, descending through embedded
-attributes; add `values:` to close it as well. The key is the tag's name, not
-an attribute name, and `nil` at any segment of the path leaves the tag off the
-emission.
+action changes below read the tag's value: its first segment names an
+attribute, a calculation or an aggregate of the resource, and each further
+segment an attribute of the embedded resource the previous one holds; add
+`values:` to close it as well. The key is the tag's name, not an attribute
+name, and `nil` at any segment of the path leaves the tag off the emission.
 
 ```elixir
 counter :placement,
@@ -149,8 +150,8 @@ counter :placement,
 The declarations themselves are checked while the resource compiles: metric
 names must be unique, tag keys must be unique and must not collide with the
 keys the tag extractor adds, a closed tag needs at least one value and no
-duplicates, a `path:` must reach a single value through the resource's
-embedded attributes, and buckets must be strictly ascending positive numbers.
+duplicates, a tag the action changes read must reach a single value, with or
+without a `path:`, and buckets must be strictly ascending positive numbers.
 Spark reports a failed check as a compiler warning pointing at the offending
 declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
 declaration should fail the build.
@@ -203,15 +204,15 @@ end
 `increment_on_change/2` counts one `delivery` whenever the action leaves
 `status` holding a value the record did not have before, tagged with that
 value and with every other declared tag of the counter that names an
-attribute, a calculation or an aggregate of the resource, or a `path:` into
-an attribute. `observe_elapsed/2`
-records the time between two timestamps of the written record into
-`delivery_time`, in that distribution's unit; `where:` narrows it to the one
-transition that means delivered. Both take their extractor metadata from the
-changeset, emit nothing when the action fails, bar one case inside a
-surrounding transaction, and leave its result alone, bar a calculation or
-aggregate that fails to load there. See
-`AshMetrics.Changes.IncrementOnChange` and `AshMetrics.Changes.ObserveElapsed`.
+attribute, a calculation or an aggregate of the resource, or declares a
+`path:`. `observe_elapsed/2` records the time between two timestamps of the
+written record into `delivery_time`, in that distribution's unit; `where:`
+narrows it to the one transition that means delivered. Both take their
+extractor metadata from the changeset, emit nothing when the action fails,
+bar one case inside a surrounding transaction, and leave its result alone,
+bar a calculation or aggregate that fails to load there.
+See `AshMetrics.Changes.IncrementOnChange` and
+`AshMetrics.Changes.ObserveElapsed`.
 
 `increment_on_write/2` counts every write of the attribute instead of every
 change of it, so a create counts and an update writing the same value again

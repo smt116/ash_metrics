@@ -1,3 +1,9 @@
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.ScanSummary do
+  @moduledoc false
+  # The implementation the custom aggregate under test names; never run.
+  use Ash.Resource.Aggregate.CustomAggregate
+end
+
 defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   # Captures the compiler's stderr, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
@@ -88,7 +94,7 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
            ) == []
   end
 
-  test "a path starts at an attribute of the resource" do
+  test "a path starts at an attribute, calculation or aggregate of the resource" do
     assert [%DslError{} = error] =
              errors(
                quote(do: counter(:delivery, tags: [state: [path: [:nope, :state]]])),
@@ -99,9 +105,11 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
 
     assert message =~
              "the path of the tag :state of counter :delivery starts at :nope, " <>
-               "which is not an attribute of this resource"
+               "which is not an attribute, calculation or aggregate of this resource"
 
-    assert message =~ "Declared attributes: :id, :status, :location"
+    assert message =~
+             "Declared attributes: :id, :status, :location; calculations: none; " <>
+               "aggregates: none"
   end
 
   test "a path may only descend through an embedded resource" do
@@ -197,9 +205,199 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
                [quote(do: attribute(:payload, :map))]
              )
 
-    assert Exception.message(error) =~
+    message = Exception.message(error)
+
+    assert message =~
              "distribution :send_latency declares the tag :payload, whose attribute " <>
                "has the type Ash.Type.Map"
+
+    assert message =~ "no path reaches inside that type"
+    refute message =~ "path: [:payload"
+  end
+
+  describe "a tag read from a calculation" do
+    test "is accepted without a path, and with a path into an embedded result" do
+      assert calculation_errors(
+               quote(
+                 do:
+                   counter(:delivery,
+                     tags: [:size, :weight_class, state: [path: [:route, :state]]]
+                   )
+               )
+             ) == []
+    end
+
+    test "is refused when the calculation has a required argument" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [:above])))
+
+      message = Exception.message(error)
+
+      assert message =~
+               "counter :delivery reads the tag :above from the calculation :above, " <>
+                 "whose argument :threshold is required and has no default"
+
+      assert message =~ "give the argument a default or `allow_nil? true`"
+    end
+
+    test "is refused with a path when the calculation has a required argument" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [a: [path: [:above]]])))
+
+      assert Exception.message(error) =~ "whose argument :threshold is required"
+    end
+
+    test "is refused without a path when the calculation returns a list" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [:labels])))
+
+      assert Exception.message(error) =~
+               "counter :delivery declares the tag :labels, whose calculation has " <>
+                 "the type {:array, Ash.Type.String}, a list. A tag carries one value."
+    end
+
+    test "is refused without a path when the calculation returns a map" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [:payload])))
+
+      message = Exception.message(error)
+
+      assert message =~
+               "counter :delivery declares the tag :payload, whose calculation has " <>
+                 "the type Ash.Type.Map"
+
+      assert message =~ "no path reaches inside that type"
+      assert message =~ "read it from a calculation that returns the single value"
+    end
+
+    test "is refused without a path when the calculation returns an embedded resource" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [:route])))
+
+      message = Exception.message(error)
+
+      assert message =~ "whose calculation has the type AshMetrics.Test.Location"
+      assert message =~ "declare `route: [path: [:route, ...]]`"
+    end
+
+    test "is refused when a path goes through a list calculation" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [l: [path: [:labels]]])))
+
+      assert Exception.message(error) =~ "goes through :labels, whose type"
+    end
+
+    test "is refused when a path ends at an embedded calculation" do
+      assert [%DslError{} = error] =
+               calculation_errors(quote(do: counter(:delivery, tags: [r: [path: [:route]]])))
+
+      assert Exception.message(error) =~
+               "ends at :route, whose type AshMetrics.Test.Location is an embedded resource"
+    end
+  end
+
+  describe "a tag read from an aggregate" do
+    test "is accepted for a scalar aggregate, with or without a path" do
+      assert aggregate_errors(
+               quote(
+                 do:
+                   counter(:delivery,
+                     tags: [:scan_count, :scanned, :first_scan, first: [path: [:first_scan]]]
+                   )
+               )
+             ) == []
+    end
+
+    test "is refused when a path goes through a count aggregate" do
+      assert [%DslError{} = error] =
+               aggregate_errors(
+                 quote(do: counter(:delivery, tags: [c: [path: [:scan_count, :state]]]))
+               )
+
+      assert Exception.message(error) =~
+               "goes through :scan_count, whose type Ash.Type.Integer is not an embedded resource"
+    end
+
+    test "is refused for a list aggregate" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [:scan_ids])))
+
+      assert Exception.message(error) =~
+               "counter :delivery reads the tag :scan_ids from the aggregate " <>
+                 ":scan_ids, which is a list aggregate. A tag carries one value."
+    end
+
+    test "is refused for a list aggregate at the start of a path" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [ids: [path: [:scan_ids]]])))
+
+      assert Exception.message(error) =~ "which is a list aggregate"
+    end
+
+    test "is refused for a custom aggregate of a map type" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [:scan_summary])))
+
+      assert Exception.message(error) =~
+               "declares the tag :scan_summary, whose aggregate has the type Ash.Type.Map"
+    end
+
+    test "is accepted over a relationship path of two hops" do
+      assert aggregate_errors(
+               quote(do: counter(:delivery, tags: [:sibling_scans, :sibling_weight]))
+             ) == []
+    end
+
+    test "resolves the type of a first aggregate over a relationship path of two hops" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [:sibling_destination])))
+
+      message = Exception.message(error)
+
+      assert message =~
+               "declares the tag :sibling_destination, whose aggregate has the type " <>
+                 "AshMetrics.Test.Location"
+
+      assert message =~ "declare `sibling_destination: [path: [:sibling_destination, ...]]`"
+    end
+
+    test "is accepted for a first aggregate of a field that is itself an aggregate" do
+      assert aggregate_errors(quote(do: counter(:delivery, tags: [:sibling_scan_count]))) == []
+    end
+
+    test "is refused for a first aggregate of a list field" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [:first_readings])))
+
+      assert Exception.message(error) =~
+               "declares the tag :first_readings, whose aggregate has the type " <>
+                 "{:array, Ash.Type.Integer}, a list. A tag carries one value."
+    end
+
+    test "is refused for a first aggregate of a map field" do
+      assert [%DslError{} = error] =
+               aggregate_errors(quote(do: counter(:delivery, tags: [:first_payload])))
+
+      assert Exception.message(error) =~
+               "declares the tag :first_payload, whose aggregate has the type Ash.Type.Map"
+    end
+  end
+
+  test "a path that starts at nothing lists the calculations and aggregates" do
+    assert [%DslError{} = error] =
+             aggregate_errors(quote(do: counter(:delivery, tags: [state: [path: [:nope]]])))
+
+    message = Exception.message(error)
+
+    assert message =~
+             "starts at :nope, which is not an attribute, calculation or aggregate " <>
+               "of this resource"
+
+    assert message =~
+             "Declared attributes: :id, :status; calculations: none; aggregates: " <>
+               ":scan_count, :scanned, :first_scan, :first_payload, :first_readings, " <>
+               ":sibling_scans, :sibling_weight, :sibling_scan_count, " <>
+               ":sibling_destination, :scan_ids, :scan_summary"
   end
 
   test "a path tag is checked against the reserved tags like any other" do
@@ -356,6 +554,86 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
 
   # The embedded attribute the tag paths under test descend into.
   defp location, do: quote(do: attribute(:location, AshMetrics.Test.Location))
+
+  # A throwaway resource declaring calculations of every shape a tag may or may
+  # not read from.
+  defp calculation_errors(declarations) do
+    Compiler.dsl_errors(
+      quote do
+        metrics do
+          unquote(declarations)
+        end
+      end,
+      [quote(do: attribute(:status, :atom))],
+      [
+        quote do
+          calculations do
+            calculate :size, :atom, expr(:small)
+
+            calculate :weight_class, :atom, expr(:light) do
+              argument :threshold, :integer, default: 20
+            end
+
+            calculate :above, :boolean, expr(true) do
+              argument :threshold, :integer, allow_nil?: false
+            end
+
+            calculate :labels, {:array, :string}, fn records, _context ->
+              Enum.map(records, fn _record -> [] end)
+            end
+
+            calculate :payload, :map, fn records, _context ->
+              Enum.map(records, fn _record -> %{} end)
+            end
+
+            calculate :route, AshMetrics.Test.Location, fn records, _context ->
+              Enum.map(records, fn _record -> nil end)
+            end
+          end
+        end
+      ]
+    )
+  end
+
+  # A throwaway resource on a data layer that supports aggregates, declaring
+  # aggregates of every shape a tag may or may not read from over
+  # `AshMetrics.Test.ParcelScan`.
+  defp aggregate_errors(declarations) do
+    Compiler.dsl_errors(
+      quote do
+        metrics do
+          unquote(declarations)
+        end
+      end,
+      [quote(do: attribute(:status, :atom))],
+      [
+        quote do
+          relationships do
+            has_many :scans, AshMetrics.Test.ParcelScan, destination_attribute: :parcel_id
+          end
+        end,
+        quote do
+          aggregates do
+            count :scan_count, :scans
+            exists :scanned, :scans
+            first :first_scan, :scans, :station
+            first :first_payload, :scans, :payload
+            first :first_readings, :scans, :readings
+            count :sibling_scans, [:scans, :parcel]
+            first :sibling_weight, [:scans, :parcel], :weight
+            first :sibling_scan_count, [:scans, :parcel], :scan_count
+            first :sibling_destination, [:scans, :parcel], :destination
+            list :scan_ids, :scans, :id
+
+            custom :scan_summary, :scans, :map do
+              implementation AshMetrics.Verifiers.VerifyMetricsTest.ScanSummary
+            end
+          end
+        end
+      ],
+      Ash.DataLayer.Ets
+    )
+  end
 
   # The throwaway resource declares a `status` attribute, so that a gauge has
   # something valid to group by; pass `attributes` for anything else it needs.
