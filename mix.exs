@@ -157,6 +157,7 @@ defmodule AshMetrics.MixProject do
     [
       {:ash, "~> 3.0"},
       {:spark, "~> 2.2"},
+      {:splode, "~> 0.3"},
       {:telemetry, "~> 1.0"},
       {:telemetry_metrics, "~> 1.0"},
       # Needed only by `AshMetrics.Poller.AshOban`, which is not the default
