@@ -140,6 +140,14 @@ an `AshMetrics.Changes.TagLoadError`, and nothing written within the
 transaction persists, bulk actions included. Tag only with calculations and
 aggregates that cannot fail on the data the action writes.
 
+A custom tag extractor that fails is logged even while a transaction is
+open, and nothing rolls back. A query it runs that fails inside an open
+transaction may already have aborted that transaction: the action still
+reports success, and the surrounding transaction then fails at its next
+statement or at commit, losing the action's write. Keep any query an
+extractor runs one that cannot fail, or derive its tags from the metadata
+alone.
+
 An open tag filled this way carries whatever the row holds, one timeseries
 per distinct value. Name a bounded field, or close it with `values:`;
 never an identifier, a free-text column or anything a user typed.

@@ -61,6 +61,10 @@ defmodule AshMetrics.Changes.IncrementOnChange do
   `rollback_on_error?`. With no transaction open, a load that fails is logged
   as above, and the write persists.
 
+  A tag extractor that fails is logged whether or not a transaction is open;
+  `c:AshMetrics.TagExtractor.extract/1` states what that means for an open
+  transaction.
+
   ## Atomics
 
   The change reads the attribute's original value, which an atomic update does

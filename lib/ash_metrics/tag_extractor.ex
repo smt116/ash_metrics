@@ -35,6 +35,13 @@ defmodule AshMetrics.TagExtractor do
 
   Called on every emission: it should be cheap, and must not return a key whose
   value is unbounded.
+
+  An extractor that raises, throws or exits while an action change emits is
+  logged and the emission skipped, also while a transaction is open; nothing
+  is rolled back. A data-layer operation that fails inside an open
+  transaction may already have aborted that transaction: the action still
+  reports success, and the surrounding transaction then fails at its next
+  statement or at commit, rolling back the action's write.
   """
   @callback extract(metadata :: map()) :: tags()
 
