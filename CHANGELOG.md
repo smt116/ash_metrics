@@ -8,6 +8,8 @@ and this project adheres to
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-05
+
 ### Added
 
 - `AshMetrics.Changes.IncrementOnChange`,
@@ -255,7 +257,8 @@ and this project adheres to
   `mix igniter.install ash_metrics`, which writes the configuration and wires
   the metrics into the host application's reporter and supervision tree.
 
-[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/smt116/ash_metrics/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/smt116/ash_metrics/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/smt116/ash_metrics/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/smt116/ash_metrics/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/smt116/ash_metrics/compare/v0.3.0...v0.4.0
