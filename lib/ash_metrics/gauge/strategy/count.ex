@@ -19,12 +19,23 @@ defmodule AshMetrics.Gauge.Strategy.Count do
   loop.
 
   Every query runs with `authorize?: false`, since a poll has no actor.
+
+  It takes no options: a gauge declaring
+  `strategy: {AshMetrics.Gauge.Strategy.Count, options}` with any is rejected
+  while the resource compiles.
   """
 
   @behaviour AshMetrics.Gauge.Strategy
 
   alias AshMetrics.Dsl.Gauge
   alias AshMetrics.Gauge.Strategy
+
+  @impl AshMetrics.Gauge.Strategy
+  @spec verify(Spark.Dsl.t(), Gauge.t()) :: :ok | {:error, String.t()}
+  def verify(_dsl_state, %Gauge{strategy_opts: []}), do: :ok
+
+  def verify(_dsl_state, %Gauge{strategy_opts: opts}),
+    do: {:error, "it takes no options, and was given #{inspect(opts)}."}
 
   @impl AshMetrics.Gauge.Strategy
   @spec compute(module(), Gauge.t(), keyword()) :: {:ok, [Strategy.group()]} | {:error, term()}

@@ -63,4 +63,21 @@ defmodule AshMetrics.Gauge.Strategy do
   """
   @callback compute(resource :: module(), gauge :: Gauge.t(), opts :: keyword()) ::
               {:ok, [group()]} | {:error, term()}
+
+  @doc """
+  Checks `gauge` against the resource declaring it, while the resource
+  compiles.
+
+  `dsl_state` is the resource's DSL state, as a `Spark.Dsl.Verifier` receives
+  it; read it with `Ash.Resource.Info` and `Spark.Dsl.Verifier`. `gauge` is the
+  declaration, `strategy_opts` included. Return `{:error, message}` to reject
+  it: `AshMetrics.Verifiers.VerifyMetrics` reports `message` as a
+  `Spark.Error.DslError` at the gauge, which the compiler prints as a warning.
+
+  Optional. A strategy that does not implement it accepts every gauge.
+  """
+  @callback verify(dsl_state :: Spark.Dsl.t(), gauge :: Gauge.t()) ::
+              :ok | {:error, message :: String.t()}
+
+  @optional_callbacks verify: 2
 end

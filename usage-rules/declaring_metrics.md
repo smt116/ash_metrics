@@ -107,8 +107,9 @@ and the domain segment come from configuration and from Ash.
 The verifiers check that metric names are unique across all three primitives,
 that tag keys are unique and do not collide with the tag extractor's keys,
 that a closed tag lists at least one value and no duplicates, that buckets
-are strictly ascending positive numbers, and that a gauge groups by
-attributes of the resource.
+are strictly ascending positive numbers, that a gauge groups by attributes
+of the resource, and that a gauge passes the checks of its strategy's
+`c:AshMetrics.Gauge.Strategy.verify/2`, when the strategy implements it.
 
 They check a `path:` too: it must start at an attribute, a calculation or an
 aggregate of the resource, descend through embedded resources only, never

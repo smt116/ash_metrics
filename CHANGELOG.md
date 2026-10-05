@@ -26,6 +26,11 @@ and this project adheres to
 - A gauge's `strategy:` accepts `{module, options}`, with `options` a
   keyword list. The options are stored on the gauge as `strategy_opts`,
   which is `[]` for a strategy declared without them.
+- `c:AshMetrics.Gauge.Strategy.verify/2`, an optional callback with which a
+  strategy checks a gauge and its resource while the resource compiles.
+  `AshMetrics.Verifiers.VerifyMetrics` reports a rejection as a compiler
+  warning at the gauge. `AshMetrics.Gauge.Strategy.Count` implements it and
+  rejects any option.
 
 ### Changed
 

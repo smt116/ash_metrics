@@ -67,6 +67,14 @@ gauge :backlog,
 A strategy returns `{tags, value}` per group and returns `{:error, reason}`
 rather than raising. It returns no entry at all for a group with no rows.
 
+A strategy that takes options, or needs something of the resource, implements
+the optional `c:AshMetrics.Gauge.Strategy.verify/2` to check the gauge while
+the resource compiles. Its `{:error, message}` is reported at the gauge as a
+compiler warning, not an error. In that callback, reject every key of the
+gauge's `strategy_opts` the strategy does not take, and check that every
+attribute an option names exists with `Ash.Resource.Info.attribute/2` on the
+DSL state; never ignore an unknown option.
+
 ## Groups that vanish
 
 A gauge compiles to a last-value metric, which keeps reporting the last thing

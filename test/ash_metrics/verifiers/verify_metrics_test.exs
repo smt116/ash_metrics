@@ -20,6 +20,36 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest.Pair do
     constraints: [fields: [a: [type: :string], b: [type: :integer]]]
 end
 
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.Picky do
+  @moduledoc false
+  # A strategy whose `verify/2` requires its `:attribute` option to name an
+  # attribute of the resource; never computed.
+  @behaviour AshMetrics.Gauge.Strategy
+
+  alias Ash.Resource.Info
+
+  @impl AshMetrics.Gauge.Strategy
+  def verify(dsl_state, gauge) do
+    attribute = Keyword.get(gauge.strategy_opts, :attribute)
+
+    if Info.attribute(dsl_state, attribute),
+      do: :ok,
+      else: {:error, "#{inspect(attribute)} is not an attribute."}
+  end
+
+  @impl AshMetrics.Gauge.Strategy
+  def compute(_resource, _gauge, _opts), do: {:ok, []}
+end
+
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.Lenient do
+  @moduledoc false
+  # A strategy without `verify/2`; never computed.
+  @behaviour AshMetrics.Gauge.Strategy
+
+  @impl AshMetrics.Gauge.Strategy
+  def compute(_resource, _gauge, _opts), do: {:ok, []}
+end
+
 defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   # Captures the compiler's stderr, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
@@ -649,6 +679,57 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
     assert errors(quote(do: gauge(:backlog, group_by: [:tenant])), [
              quote(do: attribute(:tenant, :string))
            ]) == []
+  end
+
+  describe "a gauge's strategy" do
+    test "rejects a gauge its verify/2 rejects" do
+      assert [%DslError{path: [:metrics, :backlog]} = error] =
+               errors(
+                 quote do
+                   gauge :backlog,
+                     strategy: {AshMetrics.Verifiers.VerifyMetricsTest.Picky, attribute: :nope}
+                 end
+               )
+
+      assert Exception.message(error) =~
+               "gauge :backlog is rejected by its strategy " <>
+                 "AshMetrics.Verifiers.VerifyMetricsTest.Picky: :nope is not an attribute."
+    end
+
+    test "accepts a gauge its verify/2 accepts" do
+      assert errors(
+               quote do
+                 gauge :backlog,
+                   strategy: {AshMetrics.Verifiers.VerifyMetricsTest.Picky, attribute: :status}
+               end
+             ) == []
+    end
+
+    test "accepts any gauge when it does not implement verify/2" do
+      assert errors(
+               quote do
+                 gauge :backlog,
+                   strategy: {AshMetrics.Verifiers.VerifyMetricsTest.Lenient, anything: true}
+               end
+             ) == []
+    end
+
+    test "rejects options given to the :count strategy's module" do
+      assert [%DslError{} = error] =
+               errors(
+                 quote do
+                   gauge :backlog, strategy: {AshMetrics.Gauge.Strategy.Count, sample: 0.1}
+                 end
+               )
+
+      assert Exception.message(error) =~
+               "AshMetrics.Gauge.Strategy.Count: it takes no options, and was given [sample: 0.1]."
+    end
+
+    test "accepts the :count strategy's module without options" do
+      assert errors(quote(do: gauge(:backlog, strategy: {AshMetrics.Gauge.Strategy.Count, []}))) ==
+               []
+    end
   end
 
   test "a valid gauge produces no errors" do

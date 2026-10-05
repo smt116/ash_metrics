@@ -28,6 +28,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * a distribution's name suffix is a non-empty atom holding no dot, so that
     it is one segment of the metric name
   * a gauge groups by attributes of the resource, and by none of them twice
+  * a gauge passes the `c:AshMetrics.Gauge.Strategy.verify/2` of its strategy,
+    when the strategy implements it
 
   A gauge's `group_by` is not checked against the reserved tags: a gauge has no
   call site, and its tags are exactly the values of its `group_by`.
@@ -96,7 +98,24 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
 
   defp verify_metric(dsl_state, %Gauge{} = gauge) do
     with :ok <- verify_unique_group_by(dsl_state, gauge),
-         do: verify_group_by_attributes(dsl_state, gauge)
+         :ok <- verify_group_by_attributes(dsl_state, gauge),
+         do: verify_strategy(dsl_state, gauge)
+  end
+
+  defp verify_strategy(dsl_state, %Gauge{} = gauge) do
+    strategy = Gauge.strategy_module(gauge)
+
+    with true <- Code.ensure_loaded?(strategy) and function_exported?(strategy, :verify, 2),
+         {:error, message} <- strategy.verify(dsl_state, gauge) do
+      error(
+        dsl_state,
+        gauge,
+        "gauge #{inspect(gauge.name)} is rejected by its strategy " <>
+          "#{inspect(strategy)}: #{message}"
+      )
+    else
+      _accepted -> :ok
+    end
   end
 
   defp verify_unique_group_by(dsl_state, %Gauge{} = gauge) do

@@ -151,7 +151,9 @@ The declarations themselves are checked while the resource compiles: metric
 names must be unique, tag keys must be unique and must not collide with the
 keys the tag extractor adds, a closed tag needs at least one value and no
 duplicates, a tag the action changes read must reach a single value, with or
-without a `path:`, and buckets must be strictly ascending positive numbers.
+without a `path:`, buckets must be strictly ascending positive numbers, a gauge
+must group by attributes of the resource, none of them twice, and it must pass
+its strategy's `verify/2`, when the strategy implements one.
 Spark reports a failed check as a compiler warning pointing at the offending
 declaration, so compile with `mix compile --warnings-as-errors` in CI if a bad
 declaration should fail the build.
