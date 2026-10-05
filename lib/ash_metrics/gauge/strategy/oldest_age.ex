@@ -39,7 +39,9 @@ defmodule AshMetrics.Gauge.Strategy.OldestAge do
   The queries of `AshMetrics.Gauge.Strategy.Count`, with an Ash `:min`
   aggregate over `attribute` in place of each count: `1 + groups` per poll,
   once per tenant for a resource polled per tenant, every one with
-  `authorize?: false`.
+  `authorize?: false`. On `AshPostgres.DataLayer`,
+  `AshMetrics.Gauge.Strategy.Postgres.OldestAge` returns the same ages from
+  one query.
   """
 
   @behaviour AshMetrics.Gauge.Strategy

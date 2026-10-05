@@ -12,6 +12,10 @@ defmodule AshMetrics.Test.PgLimitedTask do
     gauge :limited,
       group_by: [:status],
       strategy: AshMetrics.Gauge.Strategy.Postgres.Count
+
+    gauge :limited_age,
+      group_by: [:status],
+      strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge
   end
 
   postgres do

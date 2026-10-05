@@ -4,9 +4,9 @@ defmodule AshMetrics.Gauge.Strategy.Postgres.Transformer do
   of this package, when that package is not available.
 
   A resource declaring a gauge with `AshMetrics.Gauge.Strategy.Postgres.Count`
-  as its strategy fails to compile, with an error naming the gauge, when
-  `AshPostgres.DataLayer` is not loaded. It is a compile error, not a compiler
-  warning.
+  or `AshMetrics.Gauge.Strategy.Postgres.OldestAge` as its strategy fails to
+  compile, with an error naming the gauge, when `AshPostgres.DataLayer` is not
+  loaded. It is a compile error, not a compiler warning.
   """
 
   use Spark.Dsl.Transformer
@@ -19,7 +19,8 @@ defmodule AshMetrics.Gauge.Strategy.Postgres.Transformer do
   # Each strategy needing `ash_postgres`, with the generic strategy named as
   # its replacement.
   @alternatives %{
-    AshMetrics.Gauge.Strategy.Postgres.Count => AshMetrics.Gauge.Strategy.Count
+    AshMetrics.Gauge.Strategy.Postgres.Count => AshMetrics.Gauge.Strategy.Count,
+    AshMetrics.Gauge.Strategy.Postgres.OldestAge => AshMetrics.Gauge.Strategy.OldestAge
   }
 
   @impl Spark.Dsl.Transformer

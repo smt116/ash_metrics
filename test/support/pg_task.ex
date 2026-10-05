@@ -2,10 +2,10 @@ defmodule AshMetrics.Test.PgTask do
   @moduledoc false
   # A Postgres resource whose reads are narrowed three ways a gauge has to
   # honour: a base filter hiding archived rows, and a primary read action
-  # whose preparation hides failed ones and sorts. Its gauges use
-  # `AshMetrics.Gauge.Strategy.Postgres.Count`, and the integration tests
-  # compare them with `AshMetrics.Gauge.Strategy.Count` on the same rows,
-  # also with filters through its `AshMetrics.Test.PgTaskNote` rows.
+  # whose preparation hides failed ones and sorts. Its gauges use the Postgres
+  # strategies, and the integration tests compare each with its generic
+  # counterpart on the same rows, also with filters through its
+  # `AshMetrics.Test.PgTaskNote` rows.
   use Ash.Resource,
     domain: AshMetrics.Test.Pg,
     data_layer: AshPostgres.DataLayer,
@@ -25,6 +25,14 @@ defmodule AshMetrics.Test.PgTask do
       strategy: AshMetrics.Gauge.Strategy.Postgres.Count
 
     gauge :total, strategy: AshMetrics.Gauge.Strategy.Postgres.Count
+
+    gauge :backlog_age,
+      filter: expr(status != :done),
+      group_by: [:status, :provider],
+      strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge
+
+    gauge :queue_age,
+      strategy: {AshMetrics.Gauge.Strategy.Postgres.OldestAge, attribute: :queued_at}
   end
 
   postgres do
@@ -46,6 +54,8 @@ defmodule AshMetrics.Test.PgTask do
       public?: true,
       allow_nil?: false,
       default: &DateTime.utc_now/0
+
+    attribute :queued_at, :naive_datetime, public?: true
   end
 
   relationships do

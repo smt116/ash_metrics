@@ -224,13 +224,21 @@ defmodule AshMetrics.MetricsTest do
                [:test, :pg, :pg_ticket, :reviews, :count],
                [:test, :pg, :pg_task, :backlog, :gauge],
                [:test, :pg, :pg_task, :total, :gauge],
+               [:test, :pg, :pg_task, :backlog_age, :gauge],
+               [:test, :pg, :pg_task, :queue_age, :gauge],
                [:test, :pg, :pg_limited_task, :limited, :gauge],
+               [:test, :pg, :pg_limited_task, :limited_age, :gauge],
                [:test, :pg, :pg_prefixed_task, :backlog, :gauge],
+               [:test, :pg, :pg_prefixed_task, :backlog_age, :gauge],
                [:test, :pg, :pg_latest_task, :latest, :gauge],
                [:test, :pg, :pg_latest_task, :total, :gauge],
+               [:test, :pg, :pg_latest_task, :latest_age, :gauge],
                [:test, :pg, :pg_tenant_task, :backlog, :gauge],
+               [:test, :pg, :pg_tenant_task, :backlog_age, :gauge],
                [:test, :pg, :pg_global_tenant_task, :backlog, :gauge],
-               [:test, :pg, :pg_schema_task, :backlog, :gauge]
+               [:test, :pg, :pg_global_tenant_task, :backlog_age, :gauge],
+               [:test, :pg, :pg_schema_task, :backlog, :gauge],
+               [:test, :pg, :pg_schema_task, :backlog_age, :gauge]
              ]
     end
 

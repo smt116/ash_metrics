@@ -14,6 +14,10 @@ defmodule AshMetrics.Test.PgLatestTask do
       strategy: AshMetrics.Gauge.Strategy.Postgres.Count
 
     gauge :total, strategy: AshMetrics.Gauge.Strategy.Postgres.Count
+
+    gauge :latest_age,
+      group_by: [:status],
+      strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge
   end
 
   postgres do

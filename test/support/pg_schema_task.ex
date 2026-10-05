@@ -12,6 +12,11 @@ defmodule AshMetrics.Test.PgSchemaTask do
       filter: expr(status in [:pending, :processing]),
       group_by: [:status],
       strategy: AshMetrics.Gauge.Strategy.Postgres.Count
+
+    gauge :backlog_age,
+      filter: expr(status in [:pending, :processing]),
+      group_by: [:status],
+      strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge
   end
 
   postgres do

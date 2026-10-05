@@ -18,6 +18,15 @@ defmodule AshMetrics.Gauge.Strategy.Postgres.TransformerTest do
 
       assert {:ok, _dsl_state} = Transformer.transform(resource.spark_dsl_config())
     end
+
+    test "compiles a gauge selecting Postgres.OldestAge" do
+      resource = resource({AshMetrics.Gauge.Strategy.Postgres.OldestAge, attribute: :queued_at})
+
+      assert %Gauge{strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge} =
+               AshMetrics.Info.metric!(resource, :backlog)
+
+      assert {:ok, _dsl_state} = Transformer.transform(resource.spark_dsl_config())
+    end
   end
 
   describe "without ash_postgres" do
@@ -37,6 +46,21 @@ defmodule AshMetrics.Gauge.Strategy.Postgres.TransformerTest do
       assert message =~ "such as `AshMetrics.Gauge.Strategy.Count`."
     end
 
+    test "rejects a gauge selecting Postgres.OldestAge" do
+      resource = resource({AshMetrics.Gauge.Strategy.Postgres.OldestAge, attribute: :queued_at})
+
+      assert {:error, %DslError{module: ^resource, path: [:metrics, :gauge, :backlog]} = error} =
+               Transformer.transform(resource.spark_dsl_config(), false)
+
+      message = Exception.message(error)
+
+      assert message =~
+               "`AshMetrics.Gauge.Strategy.Postgres.OldestAge` needs the `ash_postgres` " <>
+                 "package, which is not available."
+
+      assert message =~ "such as `AshMetrics.Gauge.Strategy.OldestAge`."
+    end
+
     test "leaves a gauge with another strategy alone" do
       resource = resource(AshMetrics.Gauge.Strategy.Count)
 
@@ -51,7 +75,7 @@ defmodule AshMetrics.Gauge.Strategy.Postgres.TransformerTest do
           gauge :backlog, group_by: [:status], strategy: unquote(strategy)
         end
       end,
-      [quote(do: attribute(:status, :atom))],
+      [quote(do: attribute(:status, :atom)), quote(do: attribute(:queued_at, :utc_datetime))],
       [
         quote do
           postgres do

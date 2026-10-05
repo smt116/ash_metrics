@@ -38,8 +38,10 @@ and this project adheres to
 - `AshMetrics.Gauge.Strategy.Postgres.Count`, a gauge strategy for
   `AshPostgres.DataLayer` resources that returns what
   `AshMetrics.Gauge.Strategy.Count` returns from one `GROUP BY` query per
-  poll. `ash_postgres` becomes an optional dependency, needed only by this
-  strategy; a resource selecting it without the dependency fails to compile.
+  poll, and `AshMetrics.Gauge.Strategy.Postgres.OldestAge`, its counterpart
+  for `AshMetrics.Gauge.Strategy.OldestAge`. `ash_postgres` becomes an
+  optional dependency, needed only by these two strategies; a resource
+  selecting either without the dependency fails to compile.
 
 ### Changed
 

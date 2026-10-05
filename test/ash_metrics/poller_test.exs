@@ -68,13 +68,21 @@ defmodule AshMetrics.PollerTest do
                {PgObanJob, :backlog},
                {PgTask, :backlog},
                {PgTask, :total},
+               {PgTask, :backlog_age},
+               {PgTask, :queue_age},
                {PgLimitedTask, :limited},
+               {PgLimitedTask, :limited_age},
                {PgPrefixedTask, :backlog},
+               {PgPrefixedTask, :backlog_age},
                {PgLatestTask, :latest},
                {PgLatestTask, :total},
+               {PgLatestTask, :latest_age},
                {PgTenantTask, :backlog},
+               {PgTenantTask, :backlog_age},
                {PgGlobalTenantTask, :backlog},
-               {PgSchemaTask, :backlog}
+               {PgGlobalTenantTask, :backlog_age},
+               {PgSchemaTask, :backlog},
+               {PgSchemaTask, :backlog_age}
              ]
     end
 

@@ -265,7 +265,10 @@ options — and compute the number however you like.
 
 `AshMetrics.Gauge.Strategy.OldestAge` reports a different number: the age, in
 whole seconds, of the oldest matching row in each group, measured from
-`inserted_at` or from the timestamp named by its `attribute:` option.
+`inserted_at` or from the timestamp named by its `attribute:` option, at the
+cost of `:count`. `AshMetrics.Gauge.Strategy.Postgres.OldestAge` takes the same
+option and returns the same ages from one query, and needs `ash_postgres` as
+`AshMetrics.Gauge.Strategy.Postgres.Count` does.
 
 ```elixir
 gauge :backlog_age,

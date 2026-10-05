@@ -12,6 +12,11 @@ defmodule AshMetrics.Test.PgPrefixedTask do
       filter: expr(status != :done),
       group_by: [:status],
       strategy: AshMetrics.Gauge.Strategy.Postgres.Count
+
+    gauge :backlog_age,
+      filter: expr(status != :done),
+      group_by: [:status],
+      strategy: AshMetrics.Gauge.Strategy.Postgres.OldestAge
   end
 
   postgres do

@@ -131,5 +131,6 @@ Two transformers are the exception. A resource that selects
 `AshMetrics.Poller.AshOban` without the `AshOban` extension, or with a gauge
 `period:` cron cannot express exactly, is a hard compile error naming the
 gauge, and so is a gauge selecting
-`AshMetrics.Gauge.Strategy.Postgres.Count` without `ash_postgres` in the
+`AshMetrics.Gauge.Strategy.Postgres.Count` or
+`AshMetrics.Gauge.Strategy.Postgres.OldestAge` without `ash_postgres` in the
 dependencies.
