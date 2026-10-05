@@ -45,6 +45,8 @@ defmodule AshMetrics.Gauge.Strategy.PerGroup do
   defp tenant(query, nil), do: query
   defp tenant(query, tenant), do: Ash.Query.set_tenant(query, tenant)
 
+  # The read is distinct on `group_by` after whatever the primary read action
+  # is already distinct on, so it can return one group several times.
   @spec groups(Ash.Query.t(), [atom()]) :: {:ok, [AshMetrics.tags()]} | {:error, term()}
   defp groups(query, group_by) do
     query
@@ -52,7 +54,7 @@ defmodule AshMetrics.Gauge.Strategy.PerGroup do
     |> Ash.Query.distinct(group_by)
     |> Ash.read(authorize?: false)
     |> case do
-      {:ok, records} -> {:ok, Enum.map(records, &Map.take(&1, group_by))}
+      {:ok, records} -> {:ok, records |> Enum.map(&Map.take(&1, group_by)) |> Enum.uniq()}
       {:error, error} -> {:error, error}
     end
   end

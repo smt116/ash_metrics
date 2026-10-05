@@ -21,6 +21,7 @@ defmodule AshMetrics.Gauge.Strategy.CountTest do
   alias AshMetrics.Test.Compiler
   alias AshMetrics.Test.Ets
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.LatestJob
   alias AshMetrics.Test.SchemaJob
 
   setup do
@@ -92,6 +93,22 @@ defmodule AshMetrics.Gauge.Strategy.CountTest do
       seed(status: :done, provider: "ses")
 
       assert Count.compute(Job, backlog, []) == {:ok, []}
+    end
+  end
+
+  describe "compute/3 over a distinct primary read action" do
+    test "counts each group once, as a read of that group returns it" do
+      gauge = %Gauge{name: :latest, group_by: [:status]}
+
+      seed(LatestJob, status: :pending, provider: "ses")
+      seed(LatestJob, status: :pending, provider: "ses")
+      seed(LatestJob, status: :pending, provider: "smtp")
+      seed(LatestJob, status: :done, provider: "ses")
+
+      assert groups(Count.compute(LatestJob, gauge, [])) == [
+               {%{status: :done}, 1},
+               {%{status: :pending}, 2}
+             ]
     end
   end
 
@@ -167,7 +184,7 @@ defmodule AshMetrics.Gauge.Strategy.CountTest do
     end
   end
 
-  defp seed(attrs), do: Ash.create!(Job, Map.new(attrs), authorize?: false)
+  defp seed(resource \\ Job, attrs), do: Ash.create!(resource, Map.new(attrs), authorize?: false)
 
   defp groups({:ok, groups}), do: Enum.sort(groups)
 end

@@ -14,6 +14,7 @@ defmodule AshMetrics.Test.Ets do
   alias AshMetrics.Test.AgedJob
   alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
+  alias AshMetrics.Test.LatestJob
   alias AshMetrics.Test.Order
   alias AshMetrics.Test.Parcel
   alias AshMetrics.Test.ParcelScan
@@ -26,6 +27,7 @@ defmodule AshMetrics.Test.Ets do
   def clear! do
     clear!(Job)
     clear!(AgedJob)
+    clear!(LatestJob)
     clear!(TenantJob)
     clear!(GlobalTenantJob)
     clear!(Ticket)

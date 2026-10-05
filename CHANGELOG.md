@@ -59,6 +59,13 @@ and this project adheres to
   type is `Ash.Type.Union` or `Ash.Type.Tuple`. A declaration that compiled
   cleanly may now emit a compiler warning.
 
+### Fixed
+
+- `AshMetrics.Gauge.Strategy.Count` reports each group of a grouped gauge
+  once when the resource's primary read action is distinct. It reported a
+  group once per value of the fields that action is distinct on, and the
+  group's count was emitted that many times.
+
 ## [0.5.0] - 2026-10-01
 
 ### Added
