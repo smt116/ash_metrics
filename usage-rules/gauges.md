@@ -38,6 +38,22 @@ count per group. That is `1 + groups` queries per period, multiplied by the
 number of tenants for a resource polled per tenant. A gauge with no
 `group_by:` is a single count. Every query runs with `authorize?: false`.
 
+`AshMetrics.Gauge.Strategy.OldestAge` reports the age in whole seconds of the
+oldest matching row per group instead of a count, at the cost of `:count`.
+It measures from `inserted_at` unless `attribute:` names another timestamp
+attribute; a naive timestamp is read as UTC. An empty set reads 0, exactly as
+a row written within the last second does, so alert on the age together with
+a count of the same rows rather than on the age alone. It needs a data layer
+supporting an Ash `:min` aggregate; a compile-time verifier rejects it on one
+that does not, such as `Ash.DataLayer.Simple`.
+
+```elixir
+gauge :backlog_age,
+  filter: expr(status == :pending),
+  group_by: [:provider],
+  strategy: {AshMetrics.Gauge.Strategy.OldestAge, attribute: :queued_at}
+```
+
 Keep `period:` at a minute or more. Most collectors flush on a ten second
 interval, so a shorter period buys resolution nothing reads and pays for it
 in queries every time.

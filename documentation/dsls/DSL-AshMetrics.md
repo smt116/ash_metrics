@@ -186,8 +186,9 @@ gauge name
 ```
 
 
-Declares a gauge: how many rows match a filter right now, broken down by
-the values of `group_by`.
+Declares a gauge: a value computed from the rows matching a filter right
+now, broken down by the values of `group_by`. By default the value is how
+many rows match.
 
 Nothing emits a gauge by hand. The package polls it every `period`,
 computes one value per group, and emits each one.
@@ -197,8 +198,9 @@ tags of the emission. One gauge with `group_by: [:status]` is one metric
 name with one timeseries per status.
 
 A poll costs queries. See `AshMetrics.Gauge.Strategy.Count` for what the
-default strategy costs, and `AshMetrics.Gauge.Strategy` for supplying one
-of your own.
+default strategy costs, `AshMetrics.Gauge.Strategy.OldestAge` for the age
+of the oldest matching row, and `AshMetrics.Gauge.Strategy` for supplying
+one of your own.
 
 
 
@@ -229,7 +231,7 @@ end
 
 | Name | Type | Default | Docs |
 |------|------|---------|------|
-| [`filter`](#metrics-gauge-filter){: #metrics-gauge-filter } | `any` |  | An Ash expression, built with `expr/1`, restricting what is counted. Counts every row when absent. |
+| [`filter`](#metrics-gauge-filter){: #metrics-gauge-filter } | `any` |  | An Ash expression, built with `expr/1`, restricting the rows the strategy reads. Every row when absent. |
 | [`group_by`](#metrics-gauge-group_by){: #metrics-gauge-group_by } | `list(atom)` | `[]` | Attributes of the resource to break the value down by. Their values are the tags of each emission. |
 | [`strategy`](#metrics-gauge-strategy){: #metrics-gauge-strategy } | `:count \| module \| {module, keyword}` | `:count` | `:count` for an exact count, or an `AshMetrics.Gauge.Strategy` module computing the value some other way, alone or as `{module, options}`. The options are the strategy's own; see its documentation. |
 | [`period`](#metrics-gauge-period){: #metrics-gauge-period } | `pos_integer` | `60000` | How often to poll, in milliseconds. Sub-minute periods are usually wasted resolution: most collectors flush on a ten second interval, and every poll costs queries. |

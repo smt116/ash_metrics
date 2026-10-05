@@ -2,10 +2,11 @@ defmodule AshMetrics.Dsl.Gauge do
   @moduledoc """
   A gauge declared in a resource's `metrics` block.
 
-  A gauge answers "how many right now?". Unlike a counter or a distribution it
-  is never emitted from a call site: the package polls it, computes one value
-  per group with the declared strategy, and emits each of them as a
-  `Telemetry.Metrics.LastValue`.
+  A gauge answers "how many right now?", or another question about the rows
+  matching its filter that its strategy answers, such as how old the oldest
+  is. Unlike a counter or a distribution it is never emitted from a call
+  site: the package polls it, computes one value per group with the declared
+  strategy, and emits each of them as a `Telemetry.Metrics.LastValue`.
 
   `group_by` is a list of attributes of the resource, and its values become the
   tags of the emission, so a gauge with `group_by: [:status]` publishes one

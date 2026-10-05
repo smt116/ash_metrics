@@ -102,6 +102,7 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend.Noop,
           AshMetrics.Backend.Otel,
           AshMetrics.Gauge.Strategy.Count,
+          AshMetrics.Gauge.Strategy.OldestAge,
           AshMetrics.NameBuilder.Default,
           AshMetrics.Poller.AshOban,
           AshMetrics.Poller.AshOban.Cron,

@@ -31,6 +31,10 @@ and this project adheres to
   `AshMetrics.Verifiers.VerifyMetrics` reports a rejection as a compiler
   warning at the gauge. `AshMetrics.Gauge.Strategy.Count` implements it and
   rejects any option.
+- `AshMetrics.Gauge.Strategy.OldestAge`, a gauge strategy reporting the
+  whole seconds since the oldest matching row of each group, measured from
+  `inserted_at` or from the timestamp attribute named by its `attribute:`
+  option, with the queries `AshMetrics.Gauge.Strategy.Count` runs.
 
 ### Changed
 

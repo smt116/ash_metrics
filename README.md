@@ -25,8 +25,8 @@ OTLP, StatsD, Prometheus, AppSignal. Counter emission is a synchronous
 
 - **`counter`** — "How many events? How fast?" Emitted where the fact is
   written: by hand with `increment/3`, or by an action change.
-- **`gauge`** — "How many right now?" Filled by a package-managed periodic poll
-  over the resource.
+- **`gauge`** — "How many right now? How old is the oldest?" Filled by a
+  package-managed periodic poll over the resource.
 - **`distribution`** — "What's the spread?" Observed by hand with `observe/4`,
   or by `observe_elapsed/2` on an action.
 
@@ -258,6 +258,17 @@ them with `authorize?: false`. See `AshMetrics.Gauge.Strategy.Count`. When that
 is too expensive, declare `strategy: MyApp.Stats.Backlog` — any module
 implementing `AshMetrics.Gauge.Strategy`, or `{module, options}` for one that
 takes options — and compute the number however you like.
+
+`AshMetrics.Gauge.Strategy.OldestAge` reports a different number: the age, in
+whole seconds, of the oldest matching row in each group, measured from
+`inserted_at` or from the timestamp named by its `attribute:` option.
+
+```elixir
+gauge :backlog_age,
+  filter: expr(status == :pending),
+  group_by: [:provider],
+  strategy: {AshMetrics.Gauge.Strategy.OldestAge, attribute: :queued_at}
+```
 
 Sub-minute periods are usually wasted resolution: most collectors flush on a
 ten second interval anyway, and every poll costs the queries above.

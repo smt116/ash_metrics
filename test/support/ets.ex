@@ -11,6 +11,7 @@ defmodule AshMetrics.Test.Ets do
   # the tables are named after the resource and are shared by the whole node.
 
   alias Ash.DataLayer.Ets
+  alias AshMetrics.Test.AgedJob
   alias AshMetrics.Test.GlobalTenantJob
   alias AshMetrics.Test.Job
   alias AshMetrics.Test.Order
@@ -24,6 +25,7 @@ defmodule AshMetrics.Test.Ets do
   @spec clear!() :: :ok
   def clear! do
     clear!(Job)
+    clear!(AgedJob)
     clear!(TenantJob)
     clear!(GlobalTenantJob)
     clear!(Ticket)

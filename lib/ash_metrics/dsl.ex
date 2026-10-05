@@ -153,8 +153,9 @@ defmodule AshMetrics.Dsl do
   @gauge %Spark.Dsl.Entity{
     name: :gauge,
     describe: """
-    Declares a gauge: how many rows match a filter right now, broken down by
-    the values of `group_by`.
+    Declares a gauge: a value computed from the rows matching a filter right
+    now, broken down by the values of `group_by`. By default the value is how
+    many rows match.
 
     Nothing emits a gauge by hand. The package polls it every `period`,
     computes one value per group, and emits each one.
@@ -164,8 +165,9 @@ defmodule AshMetrics.Dsl do
     name with one timeseries per status.
 
     A poll costs queries. See `AshMetrics.Gauge.Strategy.Count` for what the
-    default strategy costs, and `AshMetrics.Gauge.Strategy` for supplying one
-    of your own.
+    default strategy costs, `AshMetrics.Gauge.Strategy.OldestAge` for the age
+    of the oldest matching row, and `AshMetrics.Gauge.Strategy` for supplying
+    one of your own.
     """,
     examples: [
       "gauge :backlog, filter: expr(status == :pending)",
@@ -191,7 +193,7 @@ defmodule AshMetrics.Dsl do
         type: :any,
         required: false,
         doc:
-          "An Ash expression, built with `expr/1`, restricting what is counted. Counts every row when absent."
+          "An Ash expression, built with `expr/1`, restricting the rows the strategy reads. Every row when absent."
       ],
       group_by: [
         type: {:list, :atom},

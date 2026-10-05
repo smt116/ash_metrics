@@ -9,7 +9,7 @@ SPDX-License-Identifier: MIT
 ## Pick the primitive by the question it answers
 
 - `counter` — "How many events, and how fast?"
-- `gauge` — "How many are there right now?"
+- `gauge` — "How many are there right now, and how old is the oldest?"
 - `distribution` — "What is the spread of this observed number?"
 
 Declare them in a `metrics do` block on the resource the fact belongs to:
