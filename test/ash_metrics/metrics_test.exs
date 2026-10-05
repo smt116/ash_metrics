@@ -221,7 +221,16 @@ defmodule AshMetrics.MetricsTest do
                [:test, :pg, :pg_ticket, :time_to_resolve, :duration],
                [:test, :pg, :pg_ticket, :escalations, :count],
                [:test, :pg, :pg_ticket, :audits, :count],
-               [:test, :pg, :pg_ticket, :reviews, :count]
+               [:test, :pg, :pg_ticket, :reviews, :count],
+               [:test, :pg, :pg_task, :backlog, :gauge],
+               [:test, :pg, :pg_task, :total, :gauge],
+               [:test, :pg, :pg_limited_task, :limited, :gauge],
+               [:test, :pg, :pg_prefixed_task, :backlog, :gauge],
+               [:test, :pg, :pg_latest_task, :latest, :gauge],
+               [:test, :pg, :pg_latest_task, :total, :gauge],
+               [:test, :pg, :pg_tenant_task, :backlog, :gauge],
+               [:test, :pg, :pg_global_tenant_task, :backlog, :gauge],
+               [:test, :pg, :pg_schema_task, :backlog, :gauge]
              ]
     end
 

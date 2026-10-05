@@ -254,10 +254,14 @@ and emits one value per group, so the declaration above publishes
 
 A poll costs queries: the default `:count` strategy runs `1 + groups` of them
 per period, again per tenant for a resource that is polled per tenant, and runs
-them with `authorize?: false`. See `AshMetrics.Gauge.Strategy.Count`. When that
-is too expensive, declare `strategy: MyApp.Stats.Backlog` — any module
-implementing `AshMetrics.Gauge.Strategy`, or `{module, options}` for one that
-takes options — and compute the number however you like.
+them with `authorize?: false`. See `AshMetrics.Gauge.Strategy.Count`. On
+`AshPostgres.DataLayer`, `strategy: AshMetrics.Gauge.Strategy.Postgres.Count`
+returns the same counts from one `GROUP BY` query per period; it needs
+`ash_postgres`, an optional dependency, and selecting it without that
+dependency is a compile error. When neither will do, declare
+`strategy: MyApp.Stats.Backlog` — any module implementing
+`AshMetrics.Gauge.Strategy`, or `{module, options}` for one that takes
+options — and compute the number however you like.
 
 `AshMetrics.Gauge.Strategy.OldestAge` reports a different number: the age, in
 whole seconds, of the oldest matching row in each group, measured from

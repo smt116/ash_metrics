@@ -13,10 +13,10 @@ defmodule AshMetrics.Gauge.Strategy.Count do
   tenant for a resource `AshMetrics.Gauge.Runner` polls per tenant. A gauge
   with no `group_by` is a single count.
 
-  A resource where that is too expensive can declare its own
-  `AshMetrics.Gauge.Strategy` — an estimate from the database's own statistics,
-  a cached value, or a single hand-written query that collapses the per-group
-  loop.
+  On `AshPostgres.DataLayer`, `AshMetrics.Gauge.Strategy.Postgres.Count`
+  returns the same counts from one query. A resource where either is too
+  expensive can declare its own `AshMetrics.Gauge.Strategy`, such as an
+  estimate from the database's own statistics or a cached value.
 
   Every query runs with `authorize?: false`, since a poll has no actor.
 

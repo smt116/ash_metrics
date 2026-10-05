@@ -22,7 +22,7 @@ spark_locals_without_parens = [
 ]
 
 [
-  # `:ash_postgres` is a test-only dependency, imported so that the resources
+  # `:ash_postgres` is an optional dependency, imported so that the resources
   # in `test/support` backed by it format like the rest.
   import_deps: [:ash, :ash_postgres, :spark],
   plugins: [Spark.Formatter],

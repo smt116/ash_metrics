@@ -58,10 +58,21 @@ Keep `period:` at a minute or more. Most collectors flush on a ten second
 interval, so a shorter period buys resolution nothing reads and pays for it
 in queries every time.
 
+On a resource whose data layer is `AshPostgres.DataLayer`, declare
+`strategy: AshMetrics.Gauge.Strategy.Postgres.Count` to get the same counts
+from one `GROUP BY` query per period, per tenant where the resource is polled
+per tenant. It honours the base filter, the primary read action's
+preparations and both multitenancy strategies exactly as `:count` does. A
+compile-time verifier rejects it on any other data layer, and selecting it
+without `ash_postgres` in the dependencies is a hard compile error. Do not
+rely on either strategy for a resource whose primary read action's
+preparations set a limit or an offset: both read a truncated set of rows,
+and their results differ.
+
 When the count is too expensive, or the number is cheaper to obtain some
-other way — a database statistics estimate, a cached value, one hand-written
-query that collapses the per-group loop — point `strategy:` at a module
-implementing the `AshMetrics.Gauge.Strategy` behaviour:
+other way — a database statistics estimate, a cached value — point
+`strategy:` at a module implementing the `AshMetrics.Gauge.Strategy`
+behaviour:
 
 ```elixir
 gauge :backlog,

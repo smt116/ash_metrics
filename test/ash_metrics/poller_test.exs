@@ -23,8 +23,15 @@ defmodule AshMetrics.PollerTest do
   alias AshMetrics.Test.MarkedJob
   alias AshMetrics.Test.MarkerPoller
   alias AshMetrics.Test.ObanJob
+  alias AshMetrics.Test.PgGlobalTenantTask
   alias AshMetrics.Test.PgJob
+  alias AshMetrics.Test.PgLatestTask
+  alias AshMetrics.Test.PgLimitedTask
   alias AshMetrics.Test.PgObanJob
+  alias AshMetrics.Test.PgPrefixedTask
+  alias AshMetrics.Test.PgSchemaTask
+  alias AshMetrics.Test.PgTask
+  alias AshMetrics.Test.PgTenantTask
   alias AshMetrics.Test.SchemaJob
   alias AshMetrics.Test.TenantJob
 
@@ -58,7 +65,16 @@ defmodule AshMetrics.PollerTest do
                {ObanJob, :backlog},
                {PgJob, :backlog},
                {PgJob, :total},
-               {PgObanJob, :backlog}
+               {PgObanJob, :backlog},
+               {PgTask, :backlog},
+               {PgTask, :total},
+               {PgLimitedTask, :limited},
+               {PgPrefixedTask, :backlog},
+               {PgLatestTask, :latest},
+               {PgLatestTask, :total},
+               {PgTenantTask, :backlog},
+               {PgGlobalTenantTask, :backlog},
+               {PgSchemaTask, :backlog}
              ]
     end
 

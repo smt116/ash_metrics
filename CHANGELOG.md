@@ -35,6 +35,11 @@ and this project adheres to
   whole seconds since the oldest matching row of each group, measured from
   `inserted_at` or from the timestamp attribute named by its `attribute:`
   option, with the queries `AshMetrics.Gauge.Strategy.Count` runs.
+- `AshMetrics.Gauge.Strategy.Postgres.Count`, a gauge strategy for
+  `AshPostgres.DataLayer` resources that returns what
+  `AshMetrics.Gauge.Strategy.Count` returns from one `GROUP BY` query per
+  poll. `ash_postgres` becomes an optional dependency, needed only by this
+  strategy; a resource selecting it without the dependency fails to compile.
 
 ### Changed
 

@@ -103,6 +103,8 @@ defmodule AshMetrics.MixProject do
           AshMetrics.Backend.Otel,
           AshMetrics.Gauge.Strategy.Count,
           AshMetrics.Gauge.Strategy.OldestAge,
+          AshMetrics.Gauge.Strategy.Postgres.Count,
+          AshMetrics.Gauge.Strategy.Postgres.Transformer,
           AshMetrics.NameBuilder.Default,
           AshMetrics.Poller.AshOban,
           AshMetrics.Poller.AshOban.Cron,
@@ -171,10 +173,10 @@ defmodule AshMetrics.MixProject do
       # The `Telemetry.Metrics` bridge `AshMetrics.Backend.Otel` adapts the
       # metric definitions for. Never called from this package.
       {:otel_telemetry_metrics, "~> 0.1", optional: true},
-      # Only the Postgres integration suite needs a SQL data layer. `:dev` is
-      # in the list because `.formatter.exs` imports it and `mix format` runs
-      # in `:dev`.
-      {:ash_postgres, "~> 2.13", only: [:dev, :test]},
+      # Needed only by `AshMetrics.Gauge.Strategy.Postgres.Count`, which a
+      # gauge selects by name, and by the Postgres integration suite. An
+      # application on any other data layer never loads it.
+      {:ash_postgres, "~> 2.13", optional: true},
       # Required by the Spark.Formatter plugin in .formatter.exs and by
       # Igniter. Optional, and not restricted to an environment, because
       # Igniter depends on it unconditionally.

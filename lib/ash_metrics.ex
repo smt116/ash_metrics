@@ -53,7 +53,9 @@ defmodule AshMetrics do
 
   A declaration that fails one of this extension's verifiers is reported by the
   compiler as a warning pointing at the declaration, not as a hard error;
-  compile with `--warnings-as-errors` to turn it into one.
+  compile with `--warnings-as-errors` to turn it into one. A gauge rejected by
+  `AshMetrics.Poller.AshOban.Transformer` or
+  `AshMetrics.Gauge.Strategy.Postgres.Transformer` is a compile error.
 
   See `AshMetrics.Dsl` for the section definition and `AshMetrics.Info` for
   introspection.
@@ -62,6 +64,7 @@ defmodule AshMetrics do
   use Spark.Dsl.Extension,
     sections: [AshMetrics.Dsl.metrics()],
     transformers: [
+      AshMetrics.Gauge.Strategy.Postgres.Transformer,
       AshMetrics.Poller.AshOban.Transformer
     ],
     verifiers: [

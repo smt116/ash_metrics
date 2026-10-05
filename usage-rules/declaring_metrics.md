@@ -127,7 +127,9 @@ A verifier failure is reported through `IO.warn` as a compiler warning
 pointing at the declaration, not as a hard error. Compile with
 `mix compile --warnings-as-errors` in CI, or a bad declaration ships.
 
-The transformer behind the Oban poller is the exception: a resource that
-selects `AshMetrics.Poller.AshOban` without the `AshOban` extension, or with
-a gauge `period:` cron cannot express exactly, is a hard compile error naming
-the gauge.
+Two transformers are the exception. A resource that selects
+`AshMetrics.Poller.AshOban` without the `AshOban` extension, or with a gauge
+`period:` cron cannot express exactly, is a hard compile error naming the
+gauge, and so is a gauge selecting
+`AshMetrics.Gauge.Strategy.Postgres.Count` without `ash_postgres` in the
+dependencies.

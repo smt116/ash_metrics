@@ -9,5 +9,13 @@ defmodule AshMetrics.Test.Pg do
     resource AshMetrics.Test.PgObanJob
     resource AshMetrics.Test.PgTicket
     resource AshMetrics.Test.PgTicketComment
+    resource AshMetrics.Test.PgTask
+    resource AshMetrics.Test.PgTaskNote
+    resource AshMetrics.Test.PgLimitedTask
+    resource AshMetrics.Test.PgPrefixedTask
+    resource AshMetrics.Test.PgLatestTask
+    resource AshMetrics.Test.PgTenantTask
+    resource AshMetrics.Test.PgGlobalTenantTask
+    resource AshMetrics.Test.PgSchemaTask
   end
 end
