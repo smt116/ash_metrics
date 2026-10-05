@@ -179,6 +179,7 @@ defmodule AshMetrics.Dsl do
       """
     ],
     target: AshMetrics.Dsl.Gauge,
+    transform: {AshMetrics.Dsl.Gauge, :transform, []},
     args: [:name],
     schema: [
       name: [
@@ -199,10 +200,16 @@ defmodule AshMetrics.Dsl do
           "Attributes of the resource to break the value down by. Their values are the tags of each emission."
       ],
       strategy: [
-        type: {:or, [{:literal, :count}, {:behaviour, AshMetrics.Gauge.Strategy}]},
+        type:
+          {:or,
+           [
+             {:literal, :count},
+             {:behaviour, AshMetrics.Gauge.Strategy},
+             {:tuple, [{:behaviour, AshMetrics.Gauge.Strategy}, :keyword_list]}
+           ]},
         default: :count,
         doc:
-          "`:count` for an exact count, or an `AshMetrics.Gauge.Strategy` module computing the value some other way."
+          "`:count` for an exact count, or an `AshMetrics.Gauge.Strategy` module computing the value some other way, alone or as `{module, options}`. The options are the strategy's own; see its documentation."
       ],
       period: [
         type: :pos_integer,

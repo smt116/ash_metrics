@@ -141,6 +141,7 @@ defmodule AshMetrics.InfoTest do
                filter: nil,
                group_by: [],
                strategy: :count,
+               strategy_opts: [],
                description: nil
              } = Info.metric!(Job, :total)
     end

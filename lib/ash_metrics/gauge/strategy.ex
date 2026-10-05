@@ -12,6 +12,19 @@ defmodule AshMetrics.Gauge.Strategy do
         group_by: [:status],
         strategy: MyApp.Stats.Backlog
 
+  ## Options
+
+  A strategy that takes options is declared as `{module, options}`, with
+  `options` a keyword list:
+
+      gauge :backlog,
+        group_by: [:status],
+        strategy: {MyApp.Stats.Backlog, sample: 0.1}
+
+  The options reach the strategy as the `strategy_opts` of the gauge it is
+  handed (see `AshMetrics.Dsl.Gauge`), not through the `opts` of
+  `c:compute/3`. Their meaning is the strategy's own.
+
   ## The contract
 
   `c:compute/3` returns one entry per group, `{tags, value}`, where `tags` maps

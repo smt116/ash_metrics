@@ -23,6 +23,9 @@ and this project adheres to
   descends into a calculation returning an embedded resource.
   `AshMetrics.Verifiers.VerifyChanges` accepts a closed tag naming a
   calculation or an aggregate.
+- A gauge's `strategy:` accepts `{module, options}`, with `options` a
+  keyword list. The options are stored on the gauge as `strategy_opts`,
+  which is `[]` for a strategy declared without them.
 
 ### Changed
 

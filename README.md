@@ -254,8 +254,8 @@ A poll costs queries: the default `:count` strategy runs `1 + groups` of them
 per period, again per tenant for a resource that is polled per tenant, and runs
 them with `authorize?: false`. See `AshMetrics.Gauge.Strategy.Count`. When that
 is too expensive, declare `strategy: MyApp.Stats.Backlog` — any module
-implementing `AshMetrics.Gauge.Strategy` — and compute the number however you
-like.
+implementing `AshMetrics.Gauge.Strategy`, or `{module, options}` for one that
+takes options — and compute the number however you like.
 
 Sub-minute periods are usually wasted resolution: most collectors flush on a
 ten second interval anyway, and every poll costs the queries above.

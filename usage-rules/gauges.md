@@ -54,6 +54,16 @@ gauge :backlog,
   strategy: MyApp.Stats.Backlog
 ```
 
+A strategy that takes options is declared as `{module, options}`, with
+`options` a keyword list; the strategy reads them from the gauge's
+`strategy_opts`:
+
+```elixir
+gauge :backlog,
+  group_by: [:status],
+  strategy: {MyApp.Stats.Backlog, sample: 0.1}
+```
+
 A strategy returns `{tags, value}` per group and returns `{:error, reason}`
 rather than raising. It returns no entry at all for a group with no rows.
 

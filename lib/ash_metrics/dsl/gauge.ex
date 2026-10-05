@@ -10,6 +10,11 @@ defmodule AshMetrics.Dsl.Gauge do
   `group_by` is a list of attributes of the resource, and its values become the
   tags of the emission, so a gauge with `group_by: [:status]` publishes one
   metric name with one timeseries per status.
+
+  `strategy` holds `:count` or the strategy module, and `strategy_opts` the
+  options declared with it: `strategy: {MyApp.Strategy, threshold: 10}` is
+  stored as `strategy: MyApp.Strategy, strategy_opts: [threshold: 10]`. A
+  strategy declared without options has `strategy_opts: []`.
   """
 
   defstruct [
@@ -18,6 +23,7 @@ defmodule AshMetrics.Dsl.Gauge do
     :description,
     group_by: [],
     strategy: :count,
+    strategy_opts: [],
     period: 60_000,
     __spark_metadata__: nil
   ]
@@ -27,6 +33,7 @@ defmodule AshMetrics.Dsl.Gauge do
           filter: term(),
           group_by: [atom()],
           strategy: :count | module(),
+          strategy_opts: keyword(),
           period: pos_integer(),
           description: String.t() | nil,
           __spark_metadata__: Spark.Dsl.Entity.spark_meta() | nil
@@ -40,4 +47,11 @@ defmodule AshMetrics.Dsl.Gauge do
   @spec strategy_module(t()) :: module()
   def strategy_module(%__MODULE__{strategy: :count}), do: AshMetrics.Gauge.Strategy.Count
   def strategy_module(%__MODULE__{strategy: strategy}), do: strategy
+
+  @doc false
+  @spec transform(%__MODULE__{}) :: {:ok, t()}
+  def transform(%__MODULE__{strategy: {strategy, opts}} = gauge),
+    do: {:ok, %{gauge | strategy: strategy, strategy_opts: opts}}
+
+  def transform(%__MODULE__{} = gauge), do: {:ok, gauge}
 end

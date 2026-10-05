@@ -1,12 +1,13 @@
 defmodule AshMetrics.Gauge.Strategy.CountTest.Fixed do
   @moduledoc false
-  # A custom strategy, to prove that the DSL takes a module and that the
-  # resolution of `:count` is not the only path.
+  # A custom strategy, to prove that the DSL takes a module, alone or with
+  # options, and that the resolution of `:count` is not the only path.
 
   @behaviour AshMetrics.Gauge.Strategy
 
   @impl AshMetrics.Gauge.Strategy
-  def compute(_resource, _gauge, _opts), do: {:ok, [{%{status: :pending}, 7}]}
+  def compute(_resource, gauge, _opts),
+    do: {:ok, [{%{status: :pending}, Keyword.get(gauge.strategy_opts, :value, 7)}]}
 end
 
 defmodule AshMetrics.Gauge.Strategy.CountTest do
@@ -130,7 +131,39 @@ defmodule AshMetrics.Gauge.Strategy.CountTest do
       gauge = Info.metric!(resource, :backlog)
 
       assert Gauge.strategy_module(gauge) == Fixed
+      assert gauge.strategy_opts == []
       assert Fixed.compute(resource, gauge, []) == {:ok, [{%{status: :pending}, 7}]}
+    end
+
+    test "takes a declared strategy module with its options" do
+      resource =
+        Compiler.compile_resource(
+          quote do
+            metrics do
+              gauge :backlog, strategy: {AshMetrics.Gauge.Strategy.CountTest.Fixed, value: 3}
+            end
+          end
+        )
+
+      gauge = Info.metric!(resource, :backlog)
+
+      assert gauge.strategy == Fixed
+      assert gauge.strategy_opts == [value: 3]
+      assert Gauge.strategy_module(gauge) == Fixed
+      assert Fixed.compute(resource, gauge, []) == {:ok, [{%{status: :pending}, 3}]}
+    end
+
+    test "rejects strategy options that are not a keyword list" do
+      error =
+        Compiler.transformer_error(
+          quote do
+            metrics do
+              gauge :backlog, strategy: {AshMetrics.Gauge.Strategy.CountTest.Fixed, :value}
+            end
+          end
+        )
+
+      assert Exception.message(error) =~ "expected keyword list"
     end
   end
 
