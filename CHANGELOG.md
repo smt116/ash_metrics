@@ -72,6 +72,9 @@ and this project adheres to
   once when the resource's primary read action is distinct. It reported a
   group once per value of the fields that action is distinct on, and the
   group's count was emitted that many times.
+- `AshMetrics.Verifiers.VerifyMetrics` rejects a gauge whose `strategy:`
+  names a module that cannot be loaded or does not define `compute/3`. Such
+  a gauge compiled without a warning and failed on every poll.
 
 ## [0.5.0] - 2026-10-01
 

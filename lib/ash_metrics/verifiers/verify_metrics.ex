@@ -28,6 +28,8 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   * a distribution's name suffix is a non-empty atom holding no dot, so that
     it is one segment of the metric name
   * a gauge groups by attributes of the resource, and by none of them twice
+  * a gauge's strategy is a module that can be loaded and defines
+    `c:AshMetrics.Gauge.Strategy.compute/3`
   * a gauge passes the `c:AshMetrics.Gauge.Strategy.verify/2` of its strategy,
     when the strategy implements it
 
@@ -105,7 +107,12 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
   defp verify_strategy(dsl_state, %Gauge{} = gauge) do
     strategy = Gauge.strategy_module(gauge)
 
-    with true <- Code.ensure_loaded?(strategy) and function_exported?(strategy, :verify, 2),
+    with :ok <- verify_strategy_module(dsl_state, gauge, strategy),
+         do: verify_strategy_callback(dsl_state, gauge, strategy)
+  end
+
+  defp verify_strategy_callback(dsl_state, %Gauge{} = gauge, strategy) do
+    with true <- function_exported?(strategy, :verify, 2),
          {:error, message} <- strategy.verify(dsl_state, gauge) do
       error(
         dsl_state,
@@ -115,6 +122,32 @@ defmodule AshMetrics.Verifiers.VerifyMetrics do
       )
     else
       _accepted -> :ok
+    end
+  end
+
+  defp verify_strategy_module(dsl_state, %Gauge{} = gauge, strategy) do
+    case Code.ensure_compiled(strategy) do
+      {:module, ^strategy} ->
+        if function_exported?(strategy, :compute, 3) do
+          :ok
+        else
+          error(
+            dsl_state,
+            gauge,
+            "gauge #{inspect(gauge.name)} names #{inspect(strategy)} as its strategy, " <>
+              "which does not define compute/3. A strategy implements the " <>
+              "AshMetrics.Gauge.Strategy behaviour."
+          )
+        end
+
+      {:error, reason} ->
+        error(
+          dsl_state,
+          gauge,
+          "gauge #{inspect(gauge.name)} names #{inspect(strategy)} as its strategy, " <>
+            "which cannot be loaded (#{inspect(reason)}). Name :count or a module " <>
+            "implementing the AshMetrics.Gauge.Strategy behaviour."
+        )
     end
   end
 

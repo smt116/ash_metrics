@@ -50,6 +50,11 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest.Lenient do
   def compute(_resource, _gauge, _opts), do: {:ok, []}
 end
 
+defmodule AshMetrics.Verifiers.VerifyMetricsTest.Incomplete do
+  @moduledoc false
+  # A module named as a strategy that does not define `compute/3`.
+end
+
 defmodule AshMetrics.Verifiers.VerifyMetricsTest do
   # Captures the compiler's stderr, so it cannot run alongside other tests.
   use ExUnit.Case, async: false
@@ -712,6 +717,31 @@ defmodule AshMetrics.Verifiers.VerifyMetricsTest do
                    strategy: {AshMetrics.Verifiers.VerifyMetricsTest.Lenient, anything: true}
                end
              ) == []
+    end
+
+    test "rejects a strategy that cannot be loaded" do
+      assert [%DslError{path: [:metrics, :backlog]} = error] =
+               errors(
+                 quote(do: gauge(:backlog, strategy: AshMetrics.Verifiers.VerifyMetricsTest.Nope))
+               )
+
+      assert Exception.message(error) =~
+               "gauge :backlog names AshMetrics.Verifiers.VerifyMetricsTest.Nope as its " <>
+                 "strategy, which cannot be loaded (:nofile)"
+    end
+
+    test "rejects a strategy that does not define compute/3" do
+      assert [%DslError{path: [:metrics, :backlog]} = error] =
+               errors(
+                 quote do
+                   gauge :backlog,
+                     strategy: {AshMetrics.Verifiers.VerifyMetricsTest.Incomplete, option: true}
+                 end
+               )
+
+      assert Exception.message(error) =~
+               "gauge :backlog names AshMetrics.Verifiers.VerifyMetricsTest.Incomplete as " <>
+                 "its strategy, which does not define compute/3"
     end
 
     test "rejects options given to the :count strategy's module" do
