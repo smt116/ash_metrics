@@ -5,20 +5,16 @@ defmodule AshMetrics.Test.Compiler do
   #
   # Spark runs verifiers from an `@after_verify` hook and converts anything
   # they raise into a compiler warning, so `assert_raise` cannot see the error.
-  # `Spark.Test` registers the calling process as a collector and delivers the
-  # `Spark.Error.DslError` values as data, so verification is re-run in the
-  # test process after the module has been compiled with its output
-  # suppressed.
+  # The module is compiled with its output suppressed and its extensions'
+  # verifiers are then run against its DSL config in the test process, which
+  # returns the `Spark.Error.DslError` values as data.
   #
   # Each resource gets a unique module name and is purged when the test that
   # built it finishes.
 
-  require Spark.Test
-
   # `data_layer` replaces `Ash.DataLayer.Simple`, which supports no
   # aggregates.
-  @spec dsl_errors(Macro.t(), [Macro.t()], [Macro.t()], module()) ::
-          [Spark.Error.DslError.t()]
+  @spec dsl_errors(Macro.t(), [Macro.t()], [Macro.t()], module()) :: [Exception.t()]
   def dsl_errors(
         metrics_block,
         attributes \\ [],
@@ -28,14 +24,23 @@ defmodule AshMetrics.Test.Compiler do
     metrics_block |> compile_resource(attributes, blocks, data_layer) |> dsl_errors_for()
   end
 
-  # Re-verifies a module that is already compiled, which is how a verifier that
-  # reads the application environment is tested: the configuration it read
-  # while the module compiled can be changed and the verifier run again.
-  @spec dsl_errors_for(module()) :: [Spark.Error.DslError.t()]
+  # Runs the verifiers of a module that is already compiled, which is how a
+  # verifier that reads the application environment is tested: the
+  # configuration it read while the module compiled can be changed and the
+  # verifiers run again.
+  @spec dsl_errors_for(module()) :: [Exception.t()]
   def dsl_errors_for(module) do
-    collected = Spark.Test.dsl_errors(do: module.__verify_spark_dsl__(module))
+    dsl_config = module.spark_dsl_config()
 
-    Enum.flat_map(collected, fn {_module, errors} -> errors end)
+    module
+    |> Spark.extensions()
+    |> Enum.flat_map(& &1.verifiers())
+    |> Enum.flat_map(fn verifier ->
+      case verifier.verify(dsl_config) do
+        {:error, error} -> List.wrap(error)
+        _ok_or_warn -> []
+      end
+    end)
   end
 
   # `attributes` are extra attribute declarations, quoted, for the resource's

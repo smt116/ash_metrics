@@ -88,9 +88,9 @@ These are decisions already made. Do not relitigate them in code.
 - **Verifier failures are compiler warnings, not errors.** Spark catches a
   verifier's `DslError` and reports it through `IO.warn` with the declaration's
   location; `mix compile` still succeeds unless `--warnings-as-errors` is on.
-  Do not document them as hard compile errors. Tests for verifiers therefore go
-  through `Spark.Test.dsl_errors/1` (see `test/support/compiler.ex`), not
-  `assert_raise`.
+  Do not document them as hard compile errors. Tests for verifiers therefore
+  go through `AshMetrics.Test.Compiler.dsl_errors/4` or `dsl_errors_for/1`
+  (`test/support/compiler.ex`), not `assert_raise`.
 - **`before_action`/`after_action` telemetry is never a metrics source.** Ash's
   own docs warn against it: the cardinality is extremely high and there is no
   name to distinguish instances.
